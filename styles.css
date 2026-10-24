@@ -3,3 +3,4 @@
 
 .pdf-toolbar .text-link{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.pdf-toolbar .text-link svg{display:block;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
+.topic-row-link{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 7px;border-bottom:1px solid #272a33}.topic-row-link:hover{background:#20232d}.row-arrow{display:grid;place-items:center;flex:none;color:var(--accent)}.row-arrow svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
