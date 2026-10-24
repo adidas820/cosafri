@@ -1,28 +1,28 @@
 # Cuaderno
 
-Una pequeña aplicación de estudio en español que prepara preguntas a partir de los PDFs de clase. Los PDF colocados en `temas/` se detectan al abrir la aplicación; por ejemplo, `temas/tema1.pdf`.
+Biblioteca estática de estudio para Netlify. La web no permite subir PDFs: asignaturas, temarios y cuestionarios se publican como archivos del repositorio.
 
-## Cómo abrirla
+## Estructura del contenido
 
-La aplicación no necesita instalar dependencias ni configurar un servidor de datos. Para que el navegador pueda cargar el lector de PDF, abre una terminal en esta carpeta y ejecuta:
+```text
+temas/
+  geografia_fisica/
+    tema1.pdf
+study-data.js
+```
+
+- `temas/` guarda los PDFs originales y mantiene la separación por asignatura.
+- `study-data.js` define las asignaturas, los temarios que se muestran y los cuestionarios. Las preguntas, respuestas y explicaciones están escritas a partir de los apuntes.
+- `app.js` presenta la biblioteca, abre los PDFs y permite resolver los tests.
+
+Para añadir otra asignatura, crea su carpeta dentro de `temas/`, añade los PDF al repositorio e incorpora sus metadatos y preguntas a `study-data.js`.
+
+## Desarrollo local
+
+Desde la carpeta del proyecto, ejecuta:
 
 ```powershell
 python -m http.server 8000
 ```
 
-Después visita [http://localhost:8000](http://localhost:8000). También puedes usar cualquier servidor estático local.
-
-## Uso
-
-1. Coloca los PDF de clase en la carpeta `temas/` o pulsa **Añadir temario** para seleccionarlos.
-2. En **Tests**, elige un test rápido, un repaso de diez preguntas o el simulacro completo.
-3. Abre **Ver temario** para leer el texto extraído y buscar dentro de los apuntes.
-4. También puedes abrir una materia para repasar con tarjetas. Marca **La sabía** para registrar progreso o **Repasar otra vez** para volver a ella en otra sesión.
-
-Las preguntas se construyen con las definiciones y frases extraídas directamente del texto del documento. No se envían los apuntes a un servidor. El texto extraído y el progreso se guardan en el almacenamiento local de este navegador. Si limpias sus datos, se borrará la biblioteca.
-
-## Límites
-
-- El navegador necesita conexión a internet para cargar PDF.js desde jsDelivr la primera vez.
-- Solo se pueden procesar PDFs con texto seleccionable. Los escaneos requieren OCR, que todavía no está incluido.
-- La generación de preguntas usa reglas locales; puede funcionar mejor con temarios con texto limpio y definiciones explícitas.
+Abre [http://localhost:8000](http://localhost:8000). El mismo contenido funciona como sitio estático en Netlify.
