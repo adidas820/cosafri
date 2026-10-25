@@ -16,12 +16,21 @@
  */
 
 import { catalog as fallbackCatalog } from './study-data.js';
-import { CONFIG } from './config.js';
+
+// config.js es opcional (está en .gitignore y lo genera build.py en Netlify).
+// Se importa dinámicamente para que, si no existe, la app siga funcionando en modo estático
+// en lugar de romper toda la carga de módulos.
+let CONFIG = { supabase: { url: '', anonKey: '', enabled: false } };
+try {
+  ({ CONFIG } = await import('./config.js'));
+} catch {
+  console.info('config.js no encontrado: usando modo estático (sin Supabase).');
+}
 
 export const SUPABASE_CONFIG = {
-  url: CONFIG.supabase.url,
-  anonKey: CONFIG.supabase.anonKey,
-  enabled: CONFIG.supabase.enabled
+  url: CONFIG?.supabase?.url || '',
+  anonKey: CONFIG?.supabase?.anonKey || '',
+  enabled: Boolean(CONFIG?.supabase?.enabled)
 };
 
 const SCORE_KEY = 'cuaderno.quiz-scores.v1';
