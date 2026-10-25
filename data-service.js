@@ -858,33 +858,36 @@ export const dataService = {
     if (!this.isAuthAvailable()) return { signedIn: false };
 
     let signedInFromLink = false;
+    let linkError = null;
+
     // Comprobar si la URL trae tokens del enlace mágico (#access_token=... o ?token_hash=...)
     const hashStr = location.hash.startsWith('#') ? location.hash.slice(1) : '';
     if (hashStr.includes('access_token=') || hashStr.includes('error_description=')) {
       const params = new URLSearchParams(hashStr);
       const errDesc = params.get('error_description');
       if (errDesc) {
+        linkError = 'Ese enlace del correo ya fue utilizado (cada enlace es de un solo uso).';
         history.replaceState(null, '', location.pathname + location.search + '#inicio');
-        return { signedIn: false, error: errDesc };
-      }
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-      if (accessToken && refreshToken) {
-        const user = await authFetch('user', { token: accessToken });
-        storeSession(
-          sessionFromTokens(
-            {
-              access_token: accessToken,
-              refresh_token: refreshToken,
-              expires_in: params.get('expires_in') || 3600,
-              expires_at: params.get('expires_at'),
+      } else {
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const user = await authFetch('user', { token: accessToken });
+          storeSession(
+            sessionFromTokens(
+              {
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                expires_in: params.get('expires_in') || 3600,
+                expires_at: params.get('expires_at'),
+                user
+              },
               user
-            },
-            user
-          )
-        );
-        signedInFromLink = true;
-        history.replaceState(null, '', location.pathname + location.search + '#inicio');
+            )
+          );
+          signedInFromLink = true;
+          history.replaceState(null, '', location.pathname + location.search + '#inicio');
+        }
       }
     }
 
@@ -902,9 +905,9 @@ export const dataService = {
           signedInFromLink = true;
         }
         history.replaceState(null, '', location.pathname + (location.hash || '#inicio'));
-      } catch (err) {
+      } catch {
+        linkError = 'Ese enlace del correo ya fue utilizado (cada enlace es de un solo uso).';
         history.replaceState(null, '', location.pathname + (location.hash || '#inicio'));
-        return { signedIn: false, error: err.message };
       }
     }
 
@@ -913,7 +916,7 @@ export const dataService = {
       remoteScores = null;
       remoteProfile = null;
       mistakesCache = null;
-      return { signedIn: false };
+      return { signedIn: false, error: linkError };
     }
 
     if (!session?.user?.id) {
@@ -926,6 +929,7 @@ export const dataService = {
     }
 
     await this.syncUserData();
+    // Si ya había sesión activa en este navegador, ignoramos el error de haber pulsado dos veces el mismo enlace
     return { signedIn: signedInFromLink };
   },
 
@@ -973,6 +977,51 @@ export const dataService = {
         create_user: true,
         options: { emailRedirectTo: redirectTo }
       }
+    });
+  },
+
+  async signInWithPassword(email, password) {
+    if (!this.isAuthAvailable()) {
+      throw new Error('Supabase no está configurado.');
+    }
+    const cleanEmail = email.trim();
+    try {
+      const data = await authFetch('token?grant_type=password', {
+        method: 'POST',
+        body: { email: cleanEmail, password }
+      });
+      storeSession(sessionFromTokens(data, data.user));
+      await this.syncUserData();
+      return { status: 'signed_in' };
+    } catch (loginErr) {
+      // Si el usuario aún no existe, intentamos registrarlo con esa contraseña
+      try {
+        const signUpData = await authFetch('signup', {
+          method: 'POST',
+          body: { email: cleanEmail, password }
+        });
+        if (signUpData?.access_token) {
+          storeSession(sessionFromTokens(signUpData, signUpData.user));
+          await this.syncUserData();
+          return { status: 'signed_up' };
+        }
+        if (signUpData?.id || signUpData?.user?.id) {
+          return { status: 'confirm_email' };
+        }
+      } catch {
+        // Si ya existía (p. ej. creado por enlace mágico), devolvemos un mensaje claro
+      }
+      throw new Error('Credenciales incorrectas o cuenta sin contraseña definida. Usa "Enviar enlace al correo" o revisa tu contraseña.');
+    }
+  },
+
+  async updatePassword(newPassword) {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Inicia sesión primero.');
+    await authFetch('user', {
+      method: 'PUT',
+      token,
+      body: { password: newPassword }
     });
   },
 

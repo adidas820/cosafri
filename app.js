@@ -575,18 +575,73 @@ window.addEventListener('keydown', (event) => {
 $('#login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
   if (!email) return;
+  if (!password || password.length < 6) {
+    showToast('Introduce una contraseña de al menos 6 caracteres, o pulsa "Enviar enlace al correo".', 5000);
+    return;
+  }
   const button = $('#login-submit');
+  button.disabled = true;
+  button.textContent = 'Entrando...';
+  try {
+    const res = await dataService.signInWithPassword(email, password);
+    if (res.status === 'confirm_email') {
+      showToast(`Te hemos enviado un correo a ${email} para confirmar tu cuenta.`, 7000);
+    } else {
+      $('#login-password').value = '';
+      updateProfileLabels();
+      openProfile();
+      renderRoute();
+      showToast(`Sesión iniciada como ${email}.`, 4000);
+    }
+  } catch (err) {
+    showToast(err.message || 'No se pudo iniciar sesión.', 6000);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Entrar / Crear cuenta';
+  }
+});
+
+$('#magic-link-button').addEventListener('click', async () => {
+  const email = $('#login-email').value.trim();
+  if (!email) {
+    showToast('Escribe tu correo primero para enviarte el enlace.', 4000);
+    $('#login-email').focus();
+    return;
+  }
+  const button = $('#magic-link-button');
   button.disabled = true;
   button.textContent = 'Enviando...';
   try {
     await dataService.sendMagicLink(email);
-    showToast(`Te hemos enviado un enlace a ${email}. Ábrelo en este mismo navegador para entrar.`, 7000);
+    showToast(`Enlace enviado a ${email}. Nota: cada enlace del correo sirve para un único uso.`, 7000);
   } catch (err) {
     showToast(err.message || 'No se pudo enviar el enlace de acceso.', 5000);
   } finally {
     button.disabled = false;
-    button.textContent = 'Enviar enlace';
+    button.textContent = 'Enviar enlace al correo';
+  }
+});
+
+$('#save-password-button').addEventListener('click', async () => {
+  const newPass = $('#new-password-input').value;
+  if (!newPass || newPass.length < 6) {
+    showToast('La contraseña debe tener al menos 6 caracteres.', 4000);
+    return;
+  }
+  const button = $('#save-password-button');
+  button.disabled = true;
+  button.textContent = 'Guardando...';
+  try {
+    await dataService.updatePassword(newPass);
+    $('#new-password-input').value = '';
+    showToast('Contraseña guardada. Ya puedes usarla para entrar desde cualquier dispositivo.', 5000);
+  } catch (err) {
+    showToast(err.message || 'No se pudo guardar la contraseña.', 5000);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Guardar clave';
   }
 });
 

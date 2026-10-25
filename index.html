@@ -40,15 +40,23 @@
       <div class="account-box" id="account-box">
         <div id="account-signed-out">
           <p class="account-title">Cuenta</p>
-          <p class="account-text">Inicia sesión para guardar tus notas y tus fallos y verlos en cualquier dispositivo. Te enviaremos un enlace de acceso por email (sin contraseña).</p>
-          <form class="account-form" id="login-form">
+          <p class="account-text">Inicia sesión con email y contraseña para entrar en todos tus dispositivos tantas veces como quieras, o pide un enlace de acceso único al correo.</p>
+          <form class="account-form account-form-stack" id="login-form">
             <input id="login-email" type="email" required autocomplete="email" placeholder="tu@email.com" />
-            <button class="primary-button" id="login-submit" type="submit">Enviar enlace</button>
+            <input id="login-password" type="password" minlength="6" autocomplete="current-password" placeholder="Contraseña (mín. 6 caracteres)" />
+            <div class="account-actions">
+              <button class="primary-button" id="login-submit" type="submit">Entrar / Crear cuenta</button>
+              <button class="secondary-button" id="magic-link-button" type="button">Enviar enlace al correo</button>
+            </div>
           </form>
         </div>
         <div id="account-signed-in" hidden>
           <p class="account-title">Cuenta</p>
-          <p class="account-text">Sesión iniciada como <strong id="account-email"></strong>.</p>
+          <p class="account-text">Sesión iniciada como <strong id="account-email"></strong>. Tu sesión permanece activa en este navegador.</p>
+          <div class="account-password-row">
+            <input id="new-password-input" type="password" minlength="6" autocomplete="new-password" placeholder="Definir o cambiar contraseña (mín. 6 caract.)" />
+            <button class="secondary-button" id="save-password-button" type="button">Guardar clave</button>
+          </div>
           <button class="secondary-button" id="logout-button" type="button">Cerrar sesión</button>
         </div>
       </div>
