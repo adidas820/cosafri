@@ -16,11 +16,12 @@
  */
 
 import { catalog as fallbackCatalog } from './study-data.js';
+import { CONFIG } from './config.js';
 
 export const SUPABASE_CONFIG = {
-  url: '', // Ej: 'https://tunombredeproyecto.supabase.co'
-  anonKey: '', // Tu anon public API key de Supabase
-  enabled: false // Cambiar a true para conectar con Supabase
+  url: CONFIG.supabase.url,
+  anonKey: CONFIG.supabase.anonKey,
+  enabled: CONFIG.supabase.enabled
 };
 
 const SCORE_KEY = 'cuaderno.quiz-scores.v1';
