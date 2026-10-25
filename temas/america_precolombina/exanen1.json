@@ -1,0 +1,451 @@
+{
+  "id": "exanen1",
+  "subjectId": "america-precolombina",
+  "name": "Tema 1 · Poblamiento y Culturas Mesoamericanas",
+  "file": "temas/america_precolombina/exanen1.pdf",
+  "pages": 10,
+  "sections": [
+    {
+      "id": "poblamiento",
+      "name": "Teorías sobre el poblamiento americano",
+      "description": "Primeras hipótesis, teoría autoctonista de Ameghino y teorías aloctonistas de Hrdlicka y Rivet.",
+      "questions": [
+        {
+          "question": "¿Quién planteó en 1590 la primera hipótesis razonable de que América fue poblada desde Asia por el norte?",
+          "options": [
+            "José de Acosta en su obra Historia Natural y Moral de las Indias.",
+            "Arias Montano, quien defendía el origen en los tataranietos de Noé.",
+            "López de Gómara, quien atribuía el poblamiento a la mítica Atlántida.",
+            "Gregorio García, defensor de las antiguas migraciones judías."
+          ],
+          "answer": 0,
+          "explanation": "Según los apuntes, la primera hipótesis razonable fue la de José de Acosta (1590), quien afirmó que América pudo poblarse desde Asia a pie o navegando por una región donde ambos continentes se acercaban por el norte."
+        },
+        {
+          "question": "¿Qué defendía la teoría autoctonista de Florentino Ameghino (1884)?",
+          "options": [
+            "Que el origen de la humanidad se situaba en la Pampa argentina durante la era terciaria a partir del Homunculus Patagonicus.",
+            "Que los primeros pobladores llegaron desde Polinesia navegando hasta la Patagonia.",
+            "Que el ser humano americano evolucionó en el valle de Yukón durante el Holoceno.",
+            "Que toda la población nativa descendía exclusivamente de cazadores siberianos de la era cuaternaria."
+          ],
+          "answer": 0,
+          "explanation": "Florentino Ameghino propuso en 1884 que el origen de la humanidad estaba en la Pampa argentina en la era terciaria, a partir del Homunculus Patagonicus, distinguiendo el homo pampeanus, norteamericanus y európido."
+        },
+        {
+          "question": "¿Cómo rebatió Ales Hrdlicka la teoría autoctonista de Ameghino?",
+          "options": [
+            "Demostrando que los restos óseos eran de monos americanos y felinos mezclados con huesos humanos recientes de la era cuaternaria.",
+            "Demostrando que en la Pampa argentina nunca habitaron grupos humanos antes de la llegada europea.",
+            "Probando mediante carbono 14 que los restos pertenecían a navegantes vikingos.",
+            "Encontrando textos escritos en Siberia que narraban la migración hacia Alaska."
+          ],
+          "answer": 0,
+          "explanation": "Hrdlicka desmontó la tesis de Ameghino probando que los restos fósiles presentados pertenecían a la era cuaternaria y mezclaban huesos humanos recientes con los de monos americanos y felinos."
+        },
+        {
+          "question": "¿Qué sostiene la teoría aloctonista monoracial de Ales Hrdlicka?",
+          "options": [
+            "Que los primeros pobladores fueron cazadores asiáticos de Siberia que cruzaron el estrecho de Bering y el valle de Yukón, descendiendo todos del tronco asiático mongoloide.",
+            "Que América se pobló mediante cuatro corrientes simultáneas procedentes de Asia, Polinesia, Melanesia y Australia.",
+            "Que los pobladores cruzaron desde Australia a través de la Antártida hasta Tierra del Fuego.",
+            "Que pescadores japoneses de la cultura Jomón colonizaron inicialmente todo el continente desde Ecuador."
+          ],
+          "answer": 0,
+          "explanation": "Hrdlicka defendió un origen monoracial (tronco común asiático mongoloide) protagonizado por cazadores del noreste de Siberia que cruzaron el estrecho de Bering hacia finales de la glaciación de Wisconsin."
+        },
+        {
+          "question": "¿Cuáles son las cuatro corrientes migratorias que integran la teoría polirracial de Paul Rivet?",
+          "options": [
+            "Dos corrientes asiáticas (mongoloide y esquimal) y dos oceánicas (australiana y melano-polinésica).",
+            "Una corriente siberiana, una japonesa, una vikinga y una atlántica.",
+            "Dos corrientes africanas y dos corrientes procedentes de la India y Malasia.",
+            "Únicamente cuatro oleadas sucesivas de pueblos esquimales a través de Alaska."
+          ],
+          "answer": 0,
+          "explanation": "Paul Rivet defendió el origen polirracial del hombre americano mediante 2 corrientes asiáticas (mongoloide y esquimal) y 2 oceánicas (australiana y melano-polinésica) basándose en datos biofísicos, culturales y lingüísticos."
+        },
+        {
+          "question": "¿Qué demostró el explorador noruego Thor Heyerdahl con la expedición de la balsa Kon Tiki?",
+          "options": [
+            "Que era posible el contacto marítimo entre la costa andina (Perú) y la Polinesia arrastrado por las corrientes marinas a lo largo de 7.000 km.",
+            "Que se podía cruzar a pie desde Australia hasta la Patagonia bordeando la Antártida.",
+            "Que embarcaciones japonesas llegaron a las costas de California en el Paleolítico inferior.",
+            "Que los habitantes de la isla de Pascua no conocían ningún tipo de navegación."
+          ],
+          "answer": 0,
+          "explanation": "Thor Heyerdahl construyó la balsa Kon Tiki siguiendo modelos antiguos y partió desde el Callao (Perú) hasta Oceanía recorriendo 7.000 km para probar la viabilidad del contacto transpacífico."
+        },
+        {
+          "question": "¿Qué ruta migratoria defendió Mendes Correia para explicar la presencia australiana en América?",
+          "options": [
+            "Una ruta a través de la Antártida hasta llegar a la Patagonia y Tierra del Fuego.",
+            "Una ruta directa cruzando el estrecho de Bering durante el verano boreal.",
+            "El paso desde Tasmania hasta las islas del Caribe a través del océano Atlántico.",
+            "La llegada exclusiva al valle de México desde las islas de Hawái."
+          ],
+          "answer": 0,
+          "explanation": "Mendes Correia fue el principal defensor de la inmigración australiana a través de la Antártida usando balsas sencillas y apoyándose en similitudes lingüísticas entre aborígenes australianos y nativos de Patagonia y Tierra del Fuego."
+        },
+        {
+          "question": "¿En qué evidencias se basa la hipótesis de un contacto transpacífico entre Japón y las costas de Ecuador?",
+          "options": [
+            "En las similitudes entre los restos de cerámica de la cultura Jomón (Japón) y la cultura Valdivia (Ecuador).",
+            "En la presencia de pirámides escalonadas idénticas en Tokio y en Quito.",
+            "En el hallazgo de espadas de hierro japonesas en tumbas precerámicas de los Andes.",
+            "En documentos escritos en papel de arroz hallados en la región del Guayas."
+          ],
+          "answer": 0,
+          "explanation": "Los apuntes señalan la semejanza entre la cerámica Jomón (Japón) y la de Valdivia (en la región ecuatoriana del Guayas), aunque su principal objeción es el largo recorrido y las dificultades de navegación del Pacífico."
+        },
+        {
+          "question": "Según la conclusión general del tema, ¿hace cuántos años se sitúa el cruce de los primeros Homo sapiens por el estrecho de Bering?",
+          "options": [
+            "En torno a hace 40.000 años (entre 50.000 y 12.000), coincidiendo con el final de las glaciaciones.",
+            "Hace exactamente 65 millones de años durante la era terciaria.",
+            "Alrededor del año 2500 a.C., al mismo tiempo que nacían las primeras aldeas.",
+            "Únicamente a partir del año 1000 d.C. durante el período Postclásico."
+          ],
+          "answer": 0,
+          "explanation": "Los apuntes sitúan el paso de los primeros humanos (siempre Homo sapiens) por el estrecho de Bering en torno a los 40.000 años atrás (rango 50.000–12.000), avanzando de norte a sur."
+        }
+      ]
+    },
+    {
+      "id": "paleolitico-arcaico",
+      "name": "Paleolítico y período Arcaico / Neolítico",
+      "description": "Industria lítica, puntas de proyectil, fin de la megafauna, experimentación agrícola y fases de MacNeish.",
+      "questions": [
+        {
+          "question": "¿Qué rasgo tecnológico caracteriza el paso del Paleolítico inferior al Paleolítico superior americano?",
+          "options": [
+            "El retoque unifacial es desplazado por herramientas bifaciales y el uso generalizado de puntas de proyectil.",
+            "Se abandona por completo el uso de la piedra para fabricar todas las armas en bronce y hierro.",
+            "Desaparece la caza y los grupos humanos pasan a vivir exclusivamente del comercio marítimo.",
+            "Se inventa el torno alfarero y la rueda para el transporte en grandes caravanas."
+          ],
+          "answer": 0,
+          "explanation": "En el Paleolítico inferior los instrumentos eran toscos (percusión, sin puntas de proyectil), mientras que en el Paleolítico superior aparece el retoque bifacial y la punta de proyectil asociada a la caza de grandes herbívoros."
+        },
+        {
+          "question": "¿Cuál es el orden correcto de los cuatro estilos de puntas de lanza del Paleolítico superior en Norteamérica?",
+          "options": [
+            "Sandia, Clovis, Folsom y Plano.",
+            "Clovis, Cola de pescado, Valdivia y Olmeca.",
+            "Folsom, Sandia, Lanceolada y Clovis.",
+            "Plano, Clovis, Sandia y Tehuacán."
+          ],
+          "answer": 0,
+          "explanation": "El tema recoge la secuencia de cuatro estilos: 1) Punta Sandia (las más antiguas y toscas), 2) Punta Clovis (acanalada en un tercio), 3) Punta Folsom (acanaladura en casi toda la superficie) y 4) Puntas Plano (sin acanaladura, más estilizadas)."
+        },
+        {
+          "question": "¿Qué tipos de puntas líticas destacan en América del Sur durante el Paleolítico superior?",
+          "options": [
+            "Las puntas cola de pescado (Patagonia, Tierra del Fuego y Ecuador) y las puntas de tipo lanceolado (Ecuador y Perú).",
+            "Únicamente las puntas Sandia y Folsom importadas desde California.",
+            "Las puntas de cobre martillado y las flechas con plumas de quetzal.",
+            "Los cuchillos rituales de jade y las espadas de madera con incrustaciones de concha."
+          ],
+          "answer": 0,
+          "explanation": "En América del Sur se hallan las puntas cola de pescado con pedúnculos abiertos (Patagonia, Tierra del Fuego y Ecuador) y las lanceoladas (Ecuador y Perú, para cazar venados y auquénidos)."
+        },
+        {
+          "question": "¿Qué consecuencias trajo el inicio del Holoceno (hace unos 11.700 años) al comenzar el período Arcaico?",
+          "options": [
+            "Calentamiento progresivo, aumento del nivel del mar, extinción de la megafauna, disminución de la caza e inicio del proceso agrícola (7000 a.C.).",
+            "Una nueva glaciación que congeló toda Mesoamérica e impidió el cultivo del maíz.",
+            "La aparición de mamuts y mastodontes en las costas de Ecuador y Perú.",
+            "El abandono inmediato de la recolección para construir grandes imperios teocráticos en el 11.000 a.C."
+          ],
+          "answer": 0,
+          "explanation": "El fin de la Edad de Hielo dio paso al Holoceno, provocando el aumento del nivel del mar, menor régimen de lluvias, extinción de la megafauna y el inicio de la experimentación agrícola hacia el 7000 a.C."
+        },
+        {
+          "question": "¿Qué innovaciones tecnológicas se desarrollaron en el Arcaico tras la extinción de la megafauna?",
+          "options": [
+            "Puntas de flecha más pequeñas y afiladas, el lanzadardos (atlatl), boleadoras, trampas, cestería y piedras de machaque.",
+            "Grandes lanzas pesadas tipo Sandia, carros de guerra tirados por caballos y arados de hierro.",
+            "Uso exclusivo de redes de pesca oceánica y abandono de cualquier herramienta de piedra.",
+            "Construcción de acueductos monumentales de basalto y escritura jeroglífica en estelas."
+          ],
+          "answer": 0,
+          "explanation": "Las nuevas presas más pequeñas exigían mayor distancia y precisión, impulsando el lanzadardos (atlatl), puntas pequeñas, boleadoras, trampas, cestas para almacenar y piedras de molienda."
+        },
+        {
+          "question": "En las fases de desarrollo de MacNeish para Mesoamérica, ¿en qué fase aparecen los núcleos de asentamiento permanentes, la cerámica y cuchillos de obsidiana?",
+          "options": [
+            "En la Fase 4: Abejas (dentro de las fases agrícolas, con un 25% de agricultura en la dieta).",
+            "En la Fase 1: Agujereado (cuando la carne representaba el 60% de la dieta).",
+            "En la Fase 2: Riego (etapa preagrícola sin cerámica).",
+            "En la Fase 3: Coxcatlán (etapa de transición sin asentamientos permanentes)."
+          ],
+          "answer": 0,
+          "explanation": "En la secuencia de MacNeish (Agujereado, Riego, Coxcatlán, Abejas, Purrón, Ajalpán), es en la Fase 4 (Abejas) cuando surgen los núcleos permanentes de 200-300 habitantes, cerámica y cuchillos de obsidiana."
+        },
+        {
+          "question": "¿Dónde aparecen los primeros ejemplos de cerámica del continente citados en el tema, famosos por sus figuras femeninas asociadas al culto a la fertilidad?",
+          "options": [
+            "En Valdivia, en la costa de Ecuador.",
+            "En Monte Albán, en el valle de Oaxaca.",
+            "En Chichén Itzá, en la península de Yucatán.",
+            "En las cuevas de Nuevo México junto a las puntas Sandia."
+          ],
+          "answer": 0,
+          "explanation": "Los apuntes destacan Valdivia, en la costa de Ecuador, con los primeros ejemplos de cerámica que incluyen figuras de mujeres desnudas cubiertas con pelucas ligadas al culto a la fertilidad."
+        }
+      ]
+    },
+    {
+      "id": "formativo-olmeca",
+      "name": "Período Formativo y Cultura Olmeca",
+      "description": "Rasgos del Preclásico, etapas olmecas, economía, sociedad, cabezas colosales y Estela de Cascajal.",
+      "questions": [
+        {
+          "question": "¿Cuál de estos elementos forma parte de los rasgos comunes entre las culturas del Formativo / Preclásico mesoamericano?",
+          "options": [
+            "Cultivo de maíz, frijol y calabaza, pirámide social estratificada, juego de la pelota, sistema vigesimal con puntos y rayas y religión politeísta.",
+            "Uso generalizado de la rueda para el transporte terrestre, moneda de oro e igualdad social absoluta.",
+            "Ausencia total de centros ceremoniales y prohibición de cualquier tipo de sacrificio.",
+            "Confección de libros manuscritos únicamente en las culturas andinas y desconocimiento del calendario."
+          ],
+          "answer": 0,
+          "explanation": "Los rasgos comunes del Formativo incluyen la tríada agrícola (maíz, frijol, calabaza), estratificación social, estructuras piramidales, juego de la pelota, cuenta vigesimal (base 20) con puntos y rayas, y politeísmo."
+        },
+        {
+          "question": "¿Con qué período y características se asocia el yacimiento de Tlatilco y sus figurillas 'Pretty Ladies'?",
+          "options": [
+            "Con el Período Olmeca 1 (1500–1200 a.C.), de aldeas sedentarias igualitarias, agricultura con palo cavador y chamanes.",
+            "Con el Período Olmeca 2, momento de las grandes pirámides de piedra en La Venta.",
+            "Con el Período Clásico Terminal maya tras el abandono de Tikal.",
+            "Con la ocupación mixteca de Monte Albán en el siglo XIV."
+          ],
+          "answer": 0,
+          "explanation": "En el Período Olmeca 1 se data la cultura de Tlatilco, con aldeas igualitarias, cultivo en milpas con palo cavador, almacenamiento en pozos, presencia de chamanes y las figuras de arcilla llamadas Pretty Ladies."
+        },
+        {
+          "question": "¿Cuáles son los dos grandes centros que protagonizan el máximo apogeo cultural del Período Olmeca 2?",
+          "options": [
+            "San Lorenzo y La Venta.",
+            "Tikal y Palenque.",
+            "San José Mogote y El Tajín.",
+            "Chichén Itzá y Mayapán."
+          ],
+          "answer": 0,
+          "explanation": "El Período Olmeca 2 (máximo apogeo arquitectónico, escultórico y de expansión por Mesoamérica) se divide en dos fases principales: San Lorenzo y La Venta."
+        },
+        {
+          "question": "En el comercio olmeca, ¿qué productos intercambiaban para obtener jade, obsidiana y plumas para las élites?",
+          "options": [
+            "Hule, copal y cacao.",
+            "Trigo, cebada y herramientas de hierro.",
+            "Lana de alpaca, patatas y quínoa.",
+            "Caballos, carros de madera y vidrio soplado."
+          ],
+          "answer": 0,
+          "explanation": "El comercio olmeca obtenía materias primas y objetos preciosos (jade, obsidiana y plumas) entregando a cambio hule, copal y cacao; los comerciantes solían ir protegidos por guerreros o ser soldados."
+        },
+        {
+          "question": "¿Qué representan las famosas cabezas colosales olmecas y de dónde procedía su piedra?",
+          "options": [
+            "Posibles retratos de jefes, guerreros o personajes importantes con rasgos de apariencia negroide, talladas en piedra basáltica de las montañas Tuxtlas.",
+            "Esculturas de dioses emplumados talladas en mármol blanco traído de los Andes.",
+            "Figuras huecas de arcilla blanca que se colocaban como máscaras funerarias.",
+            "Monumentos conmemorativos de la llegada de los toltecas en el siglo X."
+          ],
+          "answer": 0,
+          "explanation": "Las cabezas colosales son esculturas monumentales en basalto de las montañas Tuxtlas (requerían entre 1.000 y 2.000 personas para moverlas) y representan posibles retratos de jefes o guerreros."
+        },
+        {
+          "question": "¿Qué son las llamadas 'Baby faces' dentro del arte olmeca?",
+          "options": [
+            "Figuras huecas de arcilla blanca que representan pequeñas criaturas asexuadas con rostro de niño-jaguar y deformación craneana.",
+            "Máscaras funerarias de jade reservadas exclusivamente para los entierros de guerreros adultos.",
+            "Relieves grabados en piedra de hombres desnudos sin genitales en diversas posturas.",
+            "Estatuas de carita sonriente halladas en la Pirámide de los Nichos."
+          ],
+          "answer": 0,
+          "explanation": "Las Baby faces olmecas son figuras huecas de arcilla blanca de criaturas asexuadas con rasgos de niño-jaguar y deformación craneana, vinculadas a algún culto."
+        },
+        {
+          "question": "¿Qué importancia tiene la Estela de Cascajal (Veracruz, datada hacia el 900 a.C.) entre los logros científicos olmecas?",
+          "options": [
+            "Es testimonio de la primera escritura jeroglífica de América, con glifos, sintaxis y lectura horizontal.",
+            "Es el primer tratado de cirugía dental y trepanación craneana del período Clásico.",
+            "Es el mapa náutico que emplearon los navegantes peruanos para viajar a Polinesia.",
+            "Es el código de leyes impuesto por el linaje Cocom en la Liga de Mayapán."
+          ],
+          "answer": 0,
+          "explanation": "Los olmecas desarrollaron la primera escritura jeroglífica de América (expresaba el poder de los jefes), destacando la Estela de Cascajal (Veracruz, 900 a.C.), que posee sintaxis y se lee horizontalmente."
+        },
+        {
+          "question": "¿Cuál era el mito fundacional que sustentaba la religión e ideología olmeca?",
+          "options": [
+            "El apareamiento entre un jaguar (símbolo de la noche, el inframundo y la inteligencia sacerdotal) y una mujer, del que nació un niño con rasgos felinos.",
+            "La creación de los humanos a partir de la espuma del mar por el dios de la lluvia Cocijo.",
+            "La lucha diaria del Sol contra los cuatro dioses Bacabs en las aguas del lago Petén.",
+            "El descenso de una serpiente de fuego desde el volcán Popocatépetl durante un eclipse."
+          ],
+          "answer": 0,
+          "explanation": "La base ideológica olmeca residía en la unión mítica entre un jaguar y una mujer (posible símbolo lunar), engendrando un niño con rasgos felinos considerado fundador de su sociedad."
+        }
+      ]
+    },
+    {
+      "id": "zapoteca-totonaca",
+      "name": "Culturas Zapoteca y Totonaca",
+      "description": "Valle de Oaxaca, San José Mogote, Monte Albán, Templo de los Danzantes, Cocijo y El Tajín.",
+      "questions": [
+        {
+          "question": "¿Cuál fue el asentamiento aldeano más representativo de la etapa prezapoteca en el valle de Oaxaca?",
+          "options": [
+            "San José Mogote, primera evidencia de estructuras ceremoniales en Oaxaca, con hasta 1.500 habitantes y zonas de trabajo diferenciadas por sexo.",
+            "Cuello, comunidad sedentaria temprana situada a orillas de los lagos del Petén.",
+            "Tlatilco, aldea costera donde se enterraba el grano en pozos subterráneos.",
+            "Tayasal, último reducto independiente conquistado a finales del siglo XVII."
+          ],
+          "answer": 0,
+          "explanation": "San José Mogote representa la etapa prezapoteca en el valle de Oaxaca: aldeas en lugares altos cerca del agua, casas rectangulares, hornos, graneros y las primeras plataformas ceremoniales de piedra."
+        },
+        {
+          "question": "¿Cómo estaba organizado el centro ceremonial zapoteca de Monte Albán?",
+          "options": [
+            "Se construyó sobre un cerro de 400 m cuya cima fue aplanada, articulado en torno a una gran plaza rectangular rodeada de construcciones piramidales bajo una teocracia.",
+            "Se edificó en el fondo de un pantano mediante islas flotantes artificiales sin edificios de piedra.",
+            "Consistía en una única muralla circular defensiva gobernada por un consejo de comerciantes sin sacerdotes.",
+            "Estaba formado por casas campesinas aisladas en la selva sin plazas ni mercados."
+          ],
+          "answer": 0,
+          "explanation": "Monte Albán se levantó sobre un cerro de 400 m de altitud con la cima aplanada: arriba residían las élites, y en las laderas el resto de la población, bajo un gobierno teocrático."
+        },
+        {
+          "question": "¿Qué dos monumentos destacan por su originalidad en las primeras etapas de Monte Albán?",
+          "options": [
+            "El Montículo en forma de punta de flecha (posible observatorio astronómico) y el Templo de los Danzantes (relieves de hombres desnudos sin genitales con glifos y numerales).",
+            "La Pirámide de los 365 Nichos y el Altar 4 con la figura emergiendo de una cueva.",
+            "El Templo de las Columnas de Serpiente Emplumada y el Altar de Cráneos.",
+            "Las cabezas colosales de basalto y la Tumba de las Columnas de La Venta."
+          ],
+          "answer": 0,
+          "explanation": "En Monte Albán sobresalen el Montículo con planta en punta de flecha (observatorio astronómico) y el Templo de los Danzantes, con relieves grabados por incisión que simulan movimiento."
+        },
+        {
+          "question": "¿Qué características tenían las tumbas y la cerámica zapoteca durante la fase Monte Albán III?",
+          "options": [
+            "Tumbas bajo los patios de las residencias con falso arco y pinturas murales, y urnas funerarias huecas de cerámica con gran influencia teotihuacana.",
+            "Fosas simples sin ofrendas excavadas en las playas y cerámica monocroma sin decoración.",
+            "Pirámides de madera flotantes y vasijas importadas exclusivamente desde Sudamérica.",
+            "Cremación obligatoria de todos los difuntos sin uso de tumbas ni ajuares funerarios."
+          ],
+          "answer": 0,
+          "explanation": "En Monte Albán III las tumbas se construían bajo los patios residenciales con antecámara, losas en falso arco, nichos y pinturas simbólicas; en alfarería destacan las urnas huecas de influencia teotihuacana."
+        },
+        {
+          "question": "¿Quién era Cocijo y qué calendarios manejaban los zapotecas?",
+          "options": [
+            "El dios de la lluvia, y empleaban el calendario solar (365 días) y el calendario ritual de 260 días llamado Piye.",
+            "El dios jaguar del inframundo, y utilizaban únicamente un calendario lunar de 28 días.",
+            "El caudillo militar que conquistó Teotihuacán, e introdujeron el calendario juliano.",
+            "El dios del viento totonaca, y medían el tiempo exclusivamente por los eclipses solares."
+          ],
+          "answer": 0,
+          "explanation": "Dentro del panteón politeísta zapoteco destacaban el dios creador y Cocijo (dios de la lluvia); en astronomía manejaban el calendario solar (365 días) y el ritual (260 días, denominado Piye)."
+        },
+        {
+          "question": "¿Cómo se produjo la decadencia de Monte Albán y qué pueblo lo ocupó posteriormente?",
+          "options": [
+            "Se fue desintegrando y abandonando poco a poco quedando como lugar de peregrinación, hasta ser ocupado en el siglo XIV por los mixtecas.",
+            "Fue destruido por una erupción volcánica repentina en el año 100 a.C. y nunca volvió a ser visitado.",
+            "Fue arrasado por las tropas españolas de Hernán Cortés mientras estaba en su máximo apogeo clásico.",
+            "Fue inundado deliberadamente por los olmecas para construir una presa hidráulica."
+          ],
+          "answer": 0,
+          "explanation": "Monte Albán se fue abandonando gradualmente a medida que la población se asentaba en otras zonas, permaneciendo como centro de peregrinación hasta su ocupación en el siglo XIV por los mixtecas."
+        },
+        {
+          "question": "¿Cuáles son las manifestaciones más representativas de la Cultura Totonaca durante la época clásica?",
+          "options": [
+            "El centro ceremonial de El Tajín con su Pirámide de los Nichos (365 nichos), las estatuas de carita sonriente y la gran importancia ritual del juego de pelota.",
+            "Las cabezas colosales de piedra basáltica y la Estela de Cascajal en Veracruz.",
+            "El sistema de terrazas agrícolas en los Andes y la domesticación de llamas y alpacas.",
+            "La Liga de Mayapán y la construcción de columnas con forma de serpiente emplumada."
+          ],
+          "answer": 0,
+          "explanation": "La cultura totonaca destaca artísticamente por el centro ceremonial de El Tajín (donde está la Pirámide de los Nichos, con 365 nichos), las estatuas de carita sonriente y el juego de pelota asociado a sacrificios y al movimiento de los astros."
+        }
+      ]
+    },
+    {
+      "id": "cultura-maya",
+      "name": "Cultura Maya: Historia, Sociedad, Economía y Arte",
+      "description": "Etapas históricas, ciudades-estado, Halach Uinic, agricultura intensiva, comercio, cosmovisión y arte.",
+      "questions": [
+        {
+          "question": "¿Qué elementos definen el período Clásico maya (300–900 d.C.) como su etapa de máximo esplendor?",
+          "options": [
+            "El uso del falso arco, numeración vigesimal, sistema de cuenta larga, escritura jeroglífica y auge de ciudades-estado como Tikal, Palenque y Copán.",
+            "La ausencia de núcleos urbanos, igualdad social completa y cerámica exclusivamente utilitaria sin decoración.",
+            "El dominio militar de la Liga de Mayapán sobre todo el altiplano central de México.",
+            "La sustitución de los templos piramidales por fortalezas subterráneas excavadas en la roca."
+          ],
+          "answer": 0,
+          "explanation": "El período Clásico (300-900 d.C.) es el de máximo esplendor maya, caracterizado por núcleos urbanos (Tikal con la dinastía Garras de Jaguar, Palenque, Copán), falso arco, cuenta larga, sistema vigesimal y escritura jeroglífica."
+        },
+        {
+          "question": "¿Qué cambios ocurrieron en el Posclásico maya en ciudades como Chichén Itzá y Mayapán?",
+          "options": [
+            "Chichén Itzá recibió en el 987 influencia tolteca de Tula (pilares, serpientes emplumadas, altares de cráneos) y más tarde se formó la Liga de Mayapán (linajes Cocom y Xiu) hasta su revuelta en 1441.",
+            "Se abandonó por completo la península de Yucatán para trasladar todas las ciudades a la Patagonia.",
+            "Se instauró una democracia asamblearia que abolió la nobleza, los tributos y la esclavitud.",
+            "Tikal conquistó pacíficamente a los españoles y mantuvo su imperio unificado hasta el siglo XIX."
+          ],
+          "answer": 0,
+          "explanation": "En el Posclásico, Chichén Itzá fue ocupada en 987 por grupos de Tula que introdujeron rasgos toltecas; en 1100 se fundó Mayapán (gobierno de los Cocom en alianza con los Xiu de Uxmal), que cayó tras una revuelta en 1441. El último reducto maya independiente fue Tayasal hasta 1697."
+        },
+        {
+          "question": "¿Quién gobernaba cada ciudad-estado maya y qué técnicas agrícolas emplearon para aumentar la productividad?",
+          "options": [
+            "Gobernaba un señor absoluto llamado Halach Uinic asistido por un consejo; en agricultura usaron roza (milpa), campos elevados rodeados de agua y terrazas en montaña.",
+            "Gobernaba un emperador elegido cada año por los esclavos; cultivaban únicamente trigo de secano con arados tirados por bueyes.",
+            "No tenían gobernantes individuales sino gremios de alfareros; dependían al 100% de la recolección de frutos silvestres.",
+            "Gobernaba el sacerdote de Cocijo desde Monte Albán; importaban todo su alimento desde las islas del Pacífico."
+          ],
+          "answer": 0,
+          "explanation": "Cada ciudad maya estaba regida por un señor absoluto (Halach Uinic) y un consejo; su agricultura combinó la milpa de roza con técnicas hidráulicas intensivas como los campos elevados y las terrazas."
+        },
+        {
+          "question": "En el comercio maya, ¿qué productos se utilizaban como medida de cambio (moneda) y qué bienes exóticos importaban?",
+          "options": [
+            "Usaban como medida de cambio granos de cacao, conchas y cuentas de jade; importaban jade, obsidiana y plumas de quetzal.",
+            "Usaban monedas acuñadas en plata y bronce; importaban seda, porcelana y pólvora.",
+            "Usaban únicamente cabezas de ganado vacuno; importaban hierro y vidrio de Norteamérica.",
+            "El comercio estaba prohibido por los sacerdotes y cada familia campesina era totalmente autárquica."
+          ],
+          "answer": 0,
+          "explanation": "El comercio de larga distancia estaba monopolizado por las élites: importaban jade, obsidiana y plumas de quetzal, y empleaban como medida de cambio el grano de cacao, conchas y cuentas de jade."
+        },
+        {
+          "question": "¿Cómo concebían los mayas la estructura del Cosmos dentro de su religión?",
+          "options": [
+            "Dividido en tres niveles: Mundo Celeste (sostenido por 4 dioses llamados Bacabs), Mundo Terrenal (superficie cuadrada con colores en los puntos cardinales) e Inframundo (Xibalbá).",
+            "Como una esfera única gobernada exclusivamente por una diosa lunar sin inframundo ni dioses menores.",
+            "Como un océano infinito sobre el caparazón de una serpiente marina sin puntos cardinales.",
+            "Dividido únicamente entre el reino del jaguar nocturno y el desierto de los antepasados."
+          ],
+          "answer": 0,
+          "explanation": "La cosmovisión maya estructuraba el universo en: Mundo Celeste (sostenido por los 4 Bacabs), Mundo Terrenal (cuadrado con puntos cardinales asociados a colores) e Inframundo (Xibalbá, donde el Sol luchaba antes de renacer)."
+        },
+        {
+          "question": "¿Qué función tenían las estelas en la escultura maya y qué material destacaba en su arte lapidario?",
+          "options": [
+            "Las estelas (de hasta 10 m) contenían inscripciones que narraban hazañas de los gobernantes y justificaban el poder político; en lapidaria el material por excelencia era el jade.",
+            "Las estelas servían únicamente como postes para atar embarcaciones en los ríos; en lapidaria solo tallaban carbón y hueso.",
+            "Eran pequeñas figurillas infantiles de arcilla hueca; su material predilecto era el bronce fundido.",
+            "Representaban exclusivamente escenas de pesca cotidiana de los esclavos; no conocieron el uso del jade."
+          ],
+          "answer": 0,
+          "explanation": "La escultura maya se concebía como un servicio divino y político: las estelas (hasta 10 metros, labradas en ambas caras) narraban genealogías, alianzas y hazañas de los gobernantes. En lapidaria el jade fue el material más preciado, junto a la plumajería de prestigio."
+        }
+      ]
+    }
+  ]
+}

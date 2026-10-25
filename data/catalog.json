@@ -40,5 +40,53 @@
         ]
       }
     ]
+  },
+  {
+    "id": "america-precolombina",
+    "name": "América Precolombina",
+    "folder": "temas/america_precolombina",
+    "description": "Teorías del poblamiento americano, etapa lítica, arcaico y grandes culturas de Mesoamérica (Olmeca, Zapoteca, Totonaca y Maya).",
+    "color": "amber",
+    "topics": [
+      {
+        "id": "exanen1",
+        "name": "Tema 1 · Poblamiento y Culturas Mesoamericanas",
+        "file": "temas/america_precolombina/exanen1.pdf",
+        "dataPath": "temas/america_precolombina/exanen1.json",
+        "pages": 10,
+        "sections": [
+          {
+            "id": "poblamiento",
+            "name": "Teorías sobre el poblamiento americano",
+            "description": "Primeras hipótesis, teoría autoctonista de Ameghino y teorías aloctonistas de Hrdlicka y Rivet.",
+            "questionCount": 9
+          },
+          {
+            "id": "paleolitico-arcaico",
+            "name": "Paleolítico y período Arcaico / Neolítico",
+            "description": "Industria lítica, puntas de proyectil, fin de la megafauna, experimentación agrícola y fases de MacNeish.",
+            "questionCount": 7
+          },
+          {
+            "id": "formativo-olmeca",
+            "name": "Período Formativo y Cultura Olmeca",
+            "description": "Rasgos del Preclásico, etapas olmecas, economía, sociedad, cabezas colosales y Estela de Cascajal.",
+            "questionCount": 8
+          },
+          {
+            "id": "zapoteca-totonaca",
+            "name": "Culturas Zapoteca y Totonaca",
+            "description": "Valle de Oaxaca, San José Mogote, Monte Albán, Templo de los Danzantes, Cocijo y El Tajín.",
+            "questionCount": 7
+          },
+          {
+            "id": "cultura-maya",
+            "name": "Cultura Maya: Historia, Sociedad, Economía y Arte",
+            "description": "Etapas históricas, ciudades-estado, Halach Uinic, agricultura intensiva, comercio, cosmovisión y arte.",
+            "questionCount": 6
+          }
+        ]
+      }
+    ]
   }
 ]
