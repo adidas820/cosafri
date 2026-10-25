@@ -41,6 +41,58 @@
       <button class="primary-button" id="save-profile" type="button">Guardar perfil</button>
     </section>
   </div>
+  <div class="modal-backdrop" id="generate-quiz-modal" hidden>
+    <section class="profile-modal generate-modal panel" role="dialog" aria-modal="true" aria-labelledby="gen-quiz-title">
+      <button class="modal-close" id="close-gen-quiz" type="button" aria-label="Cerrar generador de test">×</button>
+      <p class="eyebrow">GENERADOR DE TESTS CON GEMINI AI</p>
+      <h2 id="gen-quiz-title">Crear nuevo test del temario</h2>
+      <p class="modal-subtitle">Selecciona el tema y el número de preguntas. Gemini leerá el PDF del temario, redactará el test y lo subirá a Supabase.</p>
+      <form id="generate-quiz-form" class="gen-quiz-form">
+        <div class="gen-form-row">
+          <label class="profile-name-field">
+            <span>Asignatura</span>
+            <select id="gen-subject-select" required></select>
+          </label>
+          <label class="profile-name-field">
+            <span>Temario</span>
+            <select id="gen-topic-select" required></select>
+          </label>
+        </div>
+        <div class="profile-name-field">
+          <span>¿Cuántas preguntas quieres en el test?</span>
+          <div class="question-count-controls">
+            <input id="gen-question-count" type="number" min="1" max="30" value="10" required />
+            <div class="count-presets" role="group" aria-label="Preajustes de cantidad de preguntas">
+              <button type="button" class="preset-pill" data-count="5">5</button>
+              <button type="button" class="preset-pill active" data-count="10">10</button>
+              <button type="button" class="preset-pill" data-count="15">15</button>
+              <button type="button" class="preset-pill" data-count="20">20</button>
+            </div>
+          </div>
+        </div>
+        <label class="profile-name-field">
+          <span>Título del test (opcional)</span>
+          <input id="gen-custom-title" type="text" maxlength="80" placeholder="Ej: Repaso general o Simulacro de examen" />
+        </label>
+        <label class="profile-name-field">
+          <span>Enfoque o instrucciones adicionales (opcional)</span>
+          <input id="gen-custom-focus" type="text" maxlength="160" placeholder="Ej: Preguntas difíciles sobre fechas, autores o definiciones" />
+        </label>
+        <label class="profile-name-field" id="gen-api-key-field">
+          <span>Gemini API Key</span>
+          <input id="gen-api-key-input" type="password" autocomplete="off" placeholder="AIzaSy... (se guarda en tu navegador)" />
+        </label>
+        <div class="gen-quiz-status" id="gen-quiz-status" hidden>
+          <div class="loading-spinner small-spinner" aria-hidden="true"></div>
+          <span id="gen-quiz-status-text">Generando preguntas con Gemini...</span>
+        </div>
+        <div class="gen-modal-actions">
+          <button class="secondary-button" id="cancel-gen-quiz" type="button">Cancelar</button>
+          <button class="primary-button" id="submit-gen-quiz" type="submit">Generar y subir a BD</button>
+        </div>
+      </form>
+    </section>
+  </div>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

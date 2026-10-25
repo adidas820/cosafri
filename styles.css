@@ -37,3 +37,33 @@
 :root .subject-dot[data-color]:not([data-color=""]){background:var(--subj-color,var(--accent));box-shadow:0 0 10px color-mix(in srgb,var(--subj-color,var(--accent)) 45%,transparent)}
 :root .subject-art[data-color]:not([data-color=""]){background:var(--subj-bg,var(--accent-soft));color:var(--subj-color,var(--accent))}
 :root .subject-card[data-color]:not([data-color=""]):hover{border-color:var(--subj-color,var(--accent))}
+
+
+/* Gemini AI Quiz Generator Modal & Controls */
+.generate-modal{width:min(100%,540px)}
+.generate-modal h2{margin:0 0 6px}
+.modal-subtitle{font-size:11px;color:var(--muted);margin:0 0 18px;line-height:1.5}
+.gen-quiz-form{display:grid;gap:14px}
+.gen-form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.profile-name-field select{width:100%;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);padding:10px 11px;font:12px var(--sans);outline:none;cursor:pointer}
+.profile-name-field select:focus{border-color:var(--accent)}
+.profile-name-field select option{background:var(--panel);color:var(--ink)}
+:root[data-theme="light"] .profile-name-field select{background:#ffffff;border-color:var(--line);color:var(--ink)}
+:root[data-theme="light"] .profile-name-field select option{background:#ffffff;color:var(--ink)}
+.question-count-controls{display:flex;align-items:center;gap:10px}
+.question-count-controls input[type="number"]{width:88px;text-align:center;font-weight:700}
+.count-presets{display:flex;gap:6px;flex:1}
+.preset-pill{flex:1;border:1px solid var(--line);border-radius:7px;background:var(--panel-2);color:var(--muted);padding:9px 8px;font:600 11px var(--sans);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.preset-pill:hover{border-color:var(--accent);color:var(--ink)}
+.preset-pill.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+:root[data-theme="light"] .preset-pill{background:#f1f3f7;border-color:var(--line);color:var(--muted)}
+:root[data-theme="light"] .preset-pill.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-2)}
+.gen-quiz-status[hidden]{display:none!important}
+.gen-quiz-status{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:7px;background:var(--panel-2);border:1px solid var(--line);font-size:11px;color:var(--ink)}
+.small-spinner{width:18px;height:18px;border-width:2px;flex:none}
+.gen-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.gen-modal-actions button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.ai-accent-button{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))!important;color:var(--accent)!important}
+.ai-accent-button:hover{background:var(--accent-soft)!important;border-color:var(--accent)!important}
+:root[data-theme="light"] .ai-accent-button{color:var(--accent-2)!important}
+@media(max-width:560px){.gen-form-row{grid-template-columns:1fr}.question-count-controls{flex-direction:column;align-items:stretch}.question-count-controls input[type="number"]{width:100%}}

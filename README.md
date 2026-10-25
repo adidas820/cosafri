@@ -1,6 +1,6 @@
 # Cuaderno
 
-Biblioteca estática de estudio para Netlify y GitHub Pages. Diseñada para alojar temarios, apuntes en PDF y cuestionarios de autoevaluación con corrección y explicaciones inmediatas.
+Biblioteca estática de estudio para Netlify y GitHub Pages. Diseñada para alojar temarios, apuntes en PDF y cuestionarios de autoevaluación con corrección y explicaciones inmediatas, además de generación de nuevos tests con **Gemini API** y sincronización en **Supabase**.
 
 ---
 
@@ -17,38 +17,40 @@ temas/
   geografia_fisica/
     tema1.pdf                      # PDF original del temario
     tema1.json                     # Batería de preguntas y explicaciones (carga diferida)
-data-service.js                    # Capa de datos (Netlify / Supabase)
+data-service.js                    # Capa de datos (Netlify / Supabase / Gemini AI)
 app.js                             # Enrutador y lógica de la aplicación
-supabase-schema.sql                # Esquema SQL y seed de datos para Supabase
+build.py                           # Generador de config.js y sincronizador con Supabase
+supabase-schema.sql                # Esquema SQL, políticas RLS y seed de datos para Supabase
 ```
+
+---
+
+## ✨ Generación de Tests con Gemini API + Supabase
+
+Desde cualquier vista (**Inicio**, **Asignaturas**, **Temario** o **Tests**), puedes pulsar **"Generar test con IA"**:
+1. Elige la **asignatura** y el **temario** sobre el que quieres practicar.
+2. Elige **cuántas preguntas** quieres que tenga el test (de 1 a 30, con botones rápidos de 5, 10, 15 o 20 preguntas).
+3. Opcionalmente indica un título o enfoque específico (por ejemplo, *"Preguntas difíciles sobre fechas y autores"*).
+4. La aplicación envía el PDF del temario a **Gemini (`gemini-3.8-flash`)** mediante la **Interactions API** con salida estructurada JSON (`response_format`), crea el cuestionario y **lo sube automáticamente a las tablas `sections` y `questions` de Supabase**.
 
 ---
 
 ## 🚀 Despliegue en Netlify
 
-El proyecto es 100% estático y compatible con Netlify:
 1. Conecta tu repositorio de GitHub en [Netlify](https://www.netlify.com/).
-2. Deja el **Build command** vacío (no requiere compilación).
-3. Establece el **Publish directory** en `.` (directorio raíz).
-4. Netlify desplegará automáticamente los PDFs y los archivos JSON estáticos con cada `git push`.
+2. Establece el **Build command** en `python3 build.py` y el **Publish directory** en `.` (directorio raíz).
+3. Configura en **Site configuration > Environment variables**:
+   - `SUPABASE_URL` → URL de tu proyecto en Supabase
+   - `SUPABASE_ANON_KEY` → Clave pública `anon` de Supabase
+   - `SUPABASE_SERVICE_ROLE_KEY` → Clave `service_role` (solo usada en el build para sincronizar el catálogo estático sin exponerla al navegador)
+   - `GEMINI_API_KEY` → Clave de API de Google Gemini (opcional; si no se define en variables de entorno, el usuario puede introducirla en el modal de la web)
 
 ---
 
-## 🗄️ Integración con Supabase (Opcional)
-
-Si en el futuro deseas utilizar una base de datos en PostgreSQL con Supabase en lugar de los archivos JSON estáticos:
+## 🗄️ Configuración de Supabase
 
 1. Crea un proyecto en [Supabase](https://supabase.com/).
-2. Entra al **SQL Editor** de Supabase y ejecuta el script [supabase-schema.sql](file:///c:/Users/User/Desktop/adi/cosafri/supabase-schema.sql). Creará automáticamente las tablas (`subjects`, `topics`, `sections`, `questions`, `quiz_scores`, `student_profiles`), configurará las políticas RLS y cargará los datos iniciales.
-3. Abre [data-service.js](file:///c:/Users/User/Desktop/adi/cosafri/data-service.js) y edita:
-   ```javascript
-   export const SUPABASE_CONFIG = {
-     url: 'https://tu-proyecto.supabase.co',
-     anonKey: 'tu-clave-anon-publica',
-     enabled: true // Activa el modo Supabase
-   };
-   ```
-4. ¡Listo! La web pasará a consultar Supabase en tiempo real sin requerir cambios en el diseño ni en la interfaz.
+2. Entra al **SQL Editor** de Supabase y ejecuta el script [`supabase-schema.sql`](./supabase-schema.sql). Creará automáticamente las tablas (`subjects`, `topics`, `sections`, `questions`, `quiz_scores`, `student_profiles`), configurará las políticas RLS (incluyendo inserción para tests generados con IA) y cargará los datos iniciales.
 
 ---
 

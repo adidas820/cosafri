@@ -2,10 +2,11 @@
 """
 build.py — Script de build y sincronización con Supabase para Netlify.
 
-1. Genera `config.js` con las credenciales públicas (`SUPABASE_URL` y `SUPABASE_ANON_KEY`).
-2. Si también existe `SUPABASE_SERVICE_ROLE_KEY`, sincroniza automáticamente
+1. Genera `config.js` con las credenciales públicas de cliente (`SUPABASE_URL`, `SUPABASE_ANON_KEY`)
+   y un indicador booleano `hasServerKey` si `GEMINI_API_KEY` existe en Netlify.
+   (Ni `SUPABASE_SERVICE_ROLE_KEY` ni `GEMINI_API_KEY` se escriben jamás en config.js).
+2. Si existe `SUPABASE_SERVICE_ROLE_KEY`, sincroniza automáticamente
    todo el catálogo (`data/catalog.json` y `temas/*/*.json`) hacia las tablas de Supabase.
-   (La clave service_role NUNCA se escribe en config.js ni se expone al navegador).
 
 Configuración en Netlify:
   Build command:  python3 build.py
@@ -15,6 +16,7 @@ Variables de entorno en Netlify > Site configuration > Environment variables:
   SUPABASE_URL               →  https://tuproyecto.supabase.co
   SUPABASE_ANON_KEY          →  tu-clave-anon-publica
   SUPABASE_SERVICE_ROLE_KEY  →  tu-clave-service-role-secreta
+  GEMINI_API_KEY             →  tu-clave-de-gemini-api
 """
 
 import json
@@ -29,10 +31,12 @@ supabase_service_key = (
     os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
     or os.environ.get('SUPABASE_SERVICE_KEY', '').strip()
 )
+gemini_api_key = os.environ.get('GEMINI_API_KEY', '').strip()
 
 enabled = 'true' if supabase_url and supabase_anon_key else 'false'
+has_server_gemini = 'true' if gemini_api_key else 'false'
 
-# 1. Generar config.js (SOLO con la anonKey pública)
+# 1. Generar config.js (NUNCA escribe GEMINI_API_KEY ni SUPABASE_SERVICE_ROLE_KEY en texto plano)
 config_content = f"""/**
  * config.js — Generado automáticamente por build.py
  * NO editar a mano en producción.
@@ -42,6 +46,11 @@ export const CONFIG = {{
     url: '{supabase_url}',
     anonKey: '{supabase_anon_key}',
     enabled: {enabled}
+  }},
+  gemini: {{
+    apiKey: '',
+    hasServerKey: {has_server_gemini},
+    model: 'gemini-3.8-flash'
   }}
 }};
 """
@@ -50,7 +59,8 @@ with open('config.js', 'w', encoding='utf-8') as f:
     f.write(config_content)
 
 status = 'ACTIVADO' if enabled == 'true' else 'DESACTIVADO (modo estático)'
-print(f'✓ config.js generado — Supabase: {status}')
+gemini_status = 'ACTIVO EN SERVIDOR (Netlify Function)' if gemini_api_key else 'PENDIENTE (configurable en web o Netlify)'
+print(f'✓ config.js generado — Supabase: {status} · Gemini: {gemini_status}')
 
 
 def supabase_request(method, path, api_key, payload=None, extra_headers=None):
@@ -86,7 +96,7 @@ def sync_catalog_to_supabase():
     subjects_payload = []
     topics_payload = []
     sections_payload = []
-    topics_questions = []  # lista de tuplas (subject_id, topic_id, questions_rows)
+    topics_questions = []  # lista de tuplas (subject_id, topic_id, sec_ids, questions_rows)
 
     for subject in catalog:
         sub_id = subject['id']
@@ -122,9 +132,11 @@ def sync_catalog_to_supabase():
             )
 
             q_rows = []
+            sec_ids = []
             q_order = 1
             for s_idx, sec in enumerate(sections_source, start=1):
                 sec_id = sec['id']
+                sec_ids.append(sec_id)
                 sections_payload.append({
                     'id': sec_id,
                     'subject_id': sub_id,
@@ -147,7 +159,7 @@ def sync_catalog_to_supabase():
                     })
                     q_order += 1
 
-            topics_questions.append((sub_id, top_id, q_rows))
+            topics_questions.append((sub_id, top_id, sec_ids, q_rows))
 
     try:
         if subjects_payload:
@@ -158,10 +170,16 @@ def sync_catalog_to_supabase():
             supabase_request('POST', 'sections?on_conflict=subject_id,topic_id,id', supabase_service_key, sections_payload, upsert_headers)
 
         total_q = 0
-        for sub_id, top_id, q_rows in topics_questions:
-            # Limpiar preguntas previas de este tema e insertar la versión actual para evitar duplicados
-            del_query = f"questions?subject_id=eq.{urllib.parse.quote(sub_id)}&topic_id=eq.{urllib.parse.quote(top_id)}"
-            supabase_request('DELETE', del_query, supabase_service_key, extra_headers={'Prefer': 'return=minimal'})
+        for sub_id, top_id, sec_ids, q_rows in topics_questions:
+            # Limpiar solo preguntas de las secciones del catálogo estático para conservar tests generados con IA
+            if sec_ids:
+                sec_filter = ','.join(urllib.parse.quote(s) for s in sec_ids)
+                del_query = (
+                    f"questions?subject_id=eq.{urllib.parse.quote(sub_id)}"
+                    f"&topic_id=eq.{urllib.parse.quote(top_id)}"
+                    f"&section_id=in.({sec_filter})"
+                )
+                supabase_request('DELETE', del_query, supabase_service_key, extra_headers={'Prefer': 'return=minimal'})
             if q_rows:
                 supabase_request('POST', 'questions', supabase_service_key, q_rows, {'Prefer': 'return=minimal'})
                 total_q += len(q_rows)

@@ -83,6 +83,10 @@ create policy "Lectura pública para topics" on topics for select using (true);
 create policy "Lectura pública para sections" on sections for select using (true);
 create policy "Lectura pública para questions" on questions for select using (true);
 
+-- Políticas de inserción para tests generados con IA desde la web
+create policy "Inserción pública para sections" on sections for insert with check (true);
+create policy "Inserción pública para questions" on questions for insert with check (true);
+
 -- Políticas para puntuaciones y perfiles
 create policy "Usuarios gestionan sus propias notas" on quiz_scores
   for all using (auth.uid() = user_id or user_id is null);

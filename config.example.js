@@ -10,5 +10,9 @@ export const CONFIG = {
     url: '',       // Ej: 'https://tuproyecto.supabase.co'
     anonKey: '',   // Tu anon (public) key de Supabase
     enabled: false // Cambiar a true para activar Supabase
+  },
+  gemini: {
+    apiKey: '',    // Tu API Key de Google Gemini (AI Studio)
+    model: 'gemini-3.8-flash'
   }
 };
