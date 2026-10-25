@@ -24,6 +24,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 
 supabase_url = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
 supabase_anon_key = os.environ.get('SUPABASE_ANON_KEY', '').strip()
@@ -146,8 +147,13 @@ def sync_catalog_to_supabase():
                     'display_order': s_idx
                 })
 
-                for q in sec.get('questions', []):
+                for s_q_idx, q in enumerate(sec.get('questions', []), start=1):
+                    # UUID determinista para no romper claves foráneas en student_mistakes al redesplegar
+                    deterministic_id = str(
+                        uuid.uuid5(uuid.NAMESPACE_DNS, f"cuaderno:{sub_id}:{top_id}:{sec_id}:{s_q_idx}")
+                    )
                     q_rows.append({
+                        'id': deterministic_id,
                         'subject_id': sub_id,
                         'topic_id': top_id,
                         'section_id': sec_id,
@@ -171,17 +177,8 @@ def sync_catalog_to_supabase():
 
         total_q = 0
         for sub_id, top_id, sec_ids, q_rows in topics_questions:
-            # Limpiar solo preguntas de las secciones del catálogo estático para conservar tests generados con IA
-            if sec_ids:
-                sec_filter = ','.join(urllib.parse.quote(s) for s in sec_ids)
-                del_query = (
-                    f"questions?subject_id=eq.{urllib.parse.quote(sub_id)}"
-                    f"&topic_id=eq.{urllib.parse.quote(top_id)}"
-                    f"&section_id=in.({sec_filter})"
-                )
-                supabase_request('DELETE', del_query, supabase_service_key, extra_headers={'Prefer': 'return=minimal'})
             if q_rows:
-                supabase_request('POST', 'questions', supabase_service_key, q_rows, {'Prefer': 'return=minimal'})
+                supabase_request('POST', 'questions?on_conflict=id', supabase_service_key, q_rows, upsert_headers)
                 total_q += len(q_rows)
 
         print(

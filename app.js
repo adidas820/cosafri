@@ -11,6 +11,7 @@ const ICONS = {
   chevron: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
   file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6m-6 4h6"/></svg>',
   clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>',
 };
 
 let activeQuiz = null;
@@ -75,6 +76,20 @@ function bindGenerateButtons() {
       openGenerateQuizModal(subjectId, topicId);
     });
   });
+  $('#page-content').querySelectorAll('[data-clear-mistakes]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('¿Seguro que quieres vaciar tu lista de preguntas falladas?')) return;
+      btn.disabled = true;
+      try {
+        await dataService.clearMistakes(btn.dataset.subject || '');
+        showToast('Lista de fallos vaciada.');
+        renderRoute();
+      } catch (err) {
+        btn.disabled = false;
+        showToast(err.message || 'No se pudo vaciar la lista.', 4500);
+      }
+    });
+  });
 }
 
 function subjectCard(subject) {
@@ -91,9 +106,10 @@ async function renderHome() {
   const catalog = await dataService.getCatalog();
   const scores = dataService.readScores();
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score.percentage, 0) / scores.length) : 0;
+  const mistakes = await dataService.getMistakes().catch(() => []);
   $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TU BIBLIOTECA DE ESTUDIO</p><h1>Buenas, estudiante<span>.</span></h1><p>Tus asignaturas, temarios y tests están organizados en un mismo sitio.</p></div><div class="test-actions"><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button><a class="primary-button" href="#asignaturas">Ir a mis asignaturas ${ICONS.arrow}</a></div></section>
     <section class="stats-grid"><article class="stat-card"><span class="stat-icon purple">${ICONS.folder}</span><div><span class="stat-label">Asignaturas</span><strong class="stat-number">${catalog.length}</strong><span class="stat-context">en tu biblioteca</span></div></article><article class="stat-card"><span class="stat-icon green">${ICONS.file}</span><div><span class="stat-label">Temarios</span><strong class="stat-number">${totalTopics(catalog)}</strong><span class="stat-context">listos para leer</span></div></article><article class="stat-card"><span class="stat-icon blue">${ICONS.check}</span><div><span class="stat-label">Media de tus tests</span><strong class="stat-number">${scores.length ? `${average}%` : '—'}</strong><span class="stat-context">${scores.length ? `${scores.length} tests completados` : 'empieza cuando quieras'}</span></div></article></section>
-    <section class="panel section-panel"><div class="panel-head"><h2>Mis asignaturas</h2><a class="text-link" href="#asignaturas">Ver biblioteca ${ICONS.arrow}</a></div><div class="subject-grid">${catalog.length ? catalog.map(subjectCard).join('') : '<div class="empty-card"><div><h3>La biblioteca está vacía</h3><p>Añade asignaturas y temarios al catálogo del repositorio.</p></div></div>'}</div></section>
+    ${reviewBanner(mistakes)}<section class="panel section-panel"><div class="panel-head"><h2>Mis asignaturas</h2><a class="text-link" href="#asignaturas">Ver biblioteca ${ICONS.arrow}</a></div><div class="subject-grid">${catalog.length ? catalog.map(subjectCard).join('') : '<div class="empty-card"><div><h3>La biblioteca está vacía</h3><p>Añade asignaturas y temarios al catálogo del repositorio.</p></div></div>'}</div></section>
     <section class="welcome-banner"><div class="banner-copy"><strong>¿Quieres practicar con preguntas nuevas sobre un tema?</strong><span>Genera un test a medida con Gemini AI eligiendo el número de preguntas y guárdalo en Supabase.</span></div><div class="test-actions"><button class="primary-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Crear test con Gemini</button><a class="secondary-button" href="#tests">Explorar tests ${ICONS.arrow}</a></div></section>`;
   bindGenerateButtons();
 }
@@ -128,8 +144,9 @@ async function renderTests(subjectId) {
   renderLoading('Cargando cuestionarios...');
   const catalog = await dataService.getCatalog();
   const selectedSubject = subjectId ? catalog.find((s) => s.id === subjectId) : null;
+  const mistakes = await dataService.getMistakes().catch(() => []);
   const groups = catalog.filter((subject) => !selectedSubject || subject.id === selectedSubject.id).flatMap((subject) => subject.topics.flatMap((topic) => topic.sections.map((section) => ({ subject, topic, section }))));
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">PRACTICA CON PREGUNTAS DEL TEMARIO</p><h1>Tests</h1><p>Cuestionarios redactados a partir de tus apuntes o generados a medida con Gemini AI y sincronizados en Supabase.</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.sparkle} Generar nuevo test con IA</button></section><div class="page-heading-actions"><label class="subject-filter"><span>Asignatura</span><select id="test-subject-filter"><option value="">Todas las asignaturas</option>${catalog.map((subject) => `<option value="${escapeHtml(subject.id)}" ${selectedSubject?.id === subject.id ? 'selected' : ''}>${escapeHtml(subject.name)}</option>`).join('')}</select></label></div><div class="test-groups">${groups.map(({ subject, topic, section }, index) => `<section class="panel test-group"><div class="test-group-head"><div><h2>${escapeHtml(section.name)}</h2><p>${escapeHtml(subject.name)} · ${escapeHtml(topic.name)} · ${escapeHtml(section.description)}</p></div><span class="test-count">${section.questionCount || section.questions?.length || 0} preguntas</span></div><div class="test-list"><div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>Test: ${escapeHtml(section.name)}</strong><span>Selección múltiple · respuesta y explicación al momento</span></div><a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div></section>`).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">PRACTICA CON PREGUNTAS DEL TEMARIO</p><h1>Tests</h1><p>Cuestionarios redactados a partir de tus apuntes o generados a medida con Gemini AI y sincronizados en Supabase.</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.sparkle} Generar nuevo test con IA</button></section>${reviewBanner(mistakes, selectedSubject?.id || '')}<div class="page-heading-actions"><label class="subject-filter"><span>Asignatura</span><select id="test-subject-filter"><option value="">Todas las asignaturas</option>${catalog.map((subject) => `<option value="${escapeHtml(subject.id)}" ${selectedSubject?.id === subject.id ? 'selected' : ''}>${escapeHtml(subject.name)}</option>`).join('')}</select></label></div><div class="test-groups">${groups.map(({ subject, topic, section }, index) => `<section class="panel test-group"><div class="test-group-head"><div><h2>${escapeHtml(section.name)}</h2><p>${escapeHtml(subject.name)} · ${escapeHtml(topic.name)} · ${escapeHtml(section.description)}</p></div><span class="test-count">${section.questionCount || section.questions?.length || 0} preguntas</span></div><div class="test-list"><div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>Test: ${escapeHtml(section.name)}</strong><span>Selección múltiple · respuesta y explicación al momento</span></div><a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div></section>`).join('')}</div>`;
   $('#test-subject-filter')?.addEventListener('change', (event) => {
     const next = event.target.value;
     location.hash = next ? `#tests/${encodeURIComponent(next)}` : '#tests';
@@ -165,7 +182,9 @@ async function startQuiz(subjectId, topicId, sectionId) {
       index: 0,
       score: 0,
       selected: null,
-      complete: false
+      complete: false,
+      mode: 'normal',
+      missed: []
     };
     renderQuiz();
   } catch (err) {
@@ -183,7 +202,7 @@ function renderQuiz() {
   const answered = activeQuiz.selected !== null;
   const correct = answered && activeQuiz.selected === question.answer;
   setNavigation('tests', section.name);
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">${escapeHtml(subject.name)} · ${escapeHtml(topic.name)}</p><h1>${escapeHtml(section.name)}<span>.</span></h1><p>Elige una respuesta. Después verás la explicación de tus apuntes.</p></div><a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Salir del test</a></section><section class="panel quiz-panel"><div class="quiz-meta"><span>Pregunta ${index + 1} de ${order.length}</span><span>${activeQuiz.score} ${activeQuiz.score === 1 ? 'acierto' : 'aciertos'}</span></div><div class="quiz-progress"><span style="width:${Math.round(index / order.length * 100)}%"></span></div><h2 class="quiz-question">${escapeHtml(question.question)}</h2><div class="quiz-options">${question.options.map((option, optionIndex) => {
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">${escapeHtml(activeQuiz.mode === 'review' ? (question.origin || 'Repaso de fallos') : `${subject.name} · ${topic.name}`)}</p><h1>${escapeHtml(section.name)}<span>.</span></h1><p>Elige una respuesta. Después verás la explicación de tus apuntes.</p></div><a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Salir del test</a></section><section class="panel quiz-panel"><div class="quiz-meta"><span>Pregunta ${index + 1} de ${order.length}</span><span>${activeQuiz.score} ${activeQuiz.score === 1 ? 'acierto' : 'aciertos'}</span></div><div class="quiz-progress"><span style="width:${Math.round(index / order.length * 100)}%"></span></div><h2 class="quiz-question">${escapeHtml(question.question)}</h2><div class="quiz-options">${question.options.map((option, optionIndex) => {
     let state = '';
     if (answered) state = optionIndex === question.answer ? ' correct' : optionIndex === activeQuiz.selected ? ' incorrect' : ' muted';
     return `<button class="quiz-option${state}" data-option="${optionIndex}" ${answered ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + optionIndex)}</span><span>${escapeHtml(option)}</span>${answered && optionIndex === question.answer ? `<span class="option-check">${ICONS.check}</span>` : ''}</button>`;
@@ -192,7 +211,16 @@ function renderQuiz() {
   $('#page-content').querySelectorAll('[data-option]').forEach((button) => button.addEventListener('click', () => {
     const selected = Number(button.dataset.option);
     activeQuiz.selected = selected;
-    if (selected === question.answer) activeQuiz.score += 1;
+    if (selected === question.answer) {
+      activeQuiz.score += 1;
+      // En modo repaso, acertar una pregunta la saca de la lista de fallos
+      if (activeQuiz.mode === 'review') {
+        dataService.resolveMistake(question.id).catch((err) => console.warn('No se pudo quitar el fallo de la lista:', err));
+      }
+    } else {
+      activeQuiz.missed.push(question);
+      dataService.recordMistake(question).catch((err) => console.warn('No se pudo guardar el fallo:', err));
+    }
     renderQuiz();
   }));
 
@@ -205,20 +233,104 @@ function renderQuiz() {
 }
 
 async function renderQuizResult() {
-  const { subject, topic, section, score, order } = activeQuiz;
+  const { subject, topic, section, score, order, mode, missed = [], reviewSubjectId = '' } = activeQuiz;
+  const isReview = mode === 'review';
   const percentage = Math.round(score / order.length * 100);
-  await dataService.saveScore({
-    subject: subject.name,
-    section: section.name,
-    score,
-    total: order.length,
-    percentage,
-    date: new Date().toISOString()
-  });
+  if (!isReview) {
+    await dataService.saveScore({
+      subject: subject.name,
+      section: section.name,
+      score,
+      total: order.length,
+      percentage,
+      date: new Date().toISOString()
+    });
+  }
+  const loggedIn = dataService.isLoggedIn();
+  const missedCount = missed.length;
   setNavigation('tests', 'Resultado');
-  $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${ICONS.check}</span><p class="eyebrow">TEST COMPLETADO · ${escapeHtml(section.name)}</p><h2>${score} de ${order.length} correctas</h2><p>${percentage >= 80 ? 'Muy buen dominio de este bloque.' : percentage >= 60 ? 'Buen repaso. Refuerza las preguntas que te han costado.' : 'Puedes volver al temario y repetir el test cuando quieras.'}</p><div class="result-score">${percentage}%</div><div class="result-buttons"><button class="primary-button" id="retry-quiz">Repetir test ${ICONS.arrow}</button><button class="secondary-button ai-accent-button" type="button" id="gen-another-quiz">${ICONS.sparkle} Generar otro test IA</button><a class="secondary-button" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">Volver al temario</a></div></section>`;
+
+  const message = isReview
+    ? (missedCount ? `Has resuelto ${score} de tus fallos. Te ${missedCount === 1 ? 'queda 1' : `quedan ${missedCount}`} por dominar.` : 'Has resuelto todas las preguntas del repaso. ¡Fuera de tu lista!')
+    : (percentage >= 80 ? 'Muy buen dominio de este bloque.' : percentage >= 60 ? 'Buen repaso. Refuerza las preguntas que te han costado.' : 'Puedes volver al temario y repetir el test cuando quieras.');
+
+  let note = '';
+  if (missedCount && !loggedIn && dataService.isAuthAvailable()) {
+    note = '<p class="result-note">Inicia sesión desde tu perfil para guardar tus fallos y repasarlos en cualquier dispositivo.</p>';
+  } else if (missedCount && loggedIn && !isReview) {
+    note = '<p class="result-note">Tus fallos se han guardado en tu lista de repaso.</p>';
+  }
+
+  const missedButton = missedCount
+    ? `<button class="primary-button" type="button" id="review-missed">${ICONS.target} Repasar ${missedCount === 1 ? 'la que he fallado' : `las ${missedCount} que he fallado`}</button>`
+    : '';
+  const otherButtons = isReview
+    ? `<a class="secondary-button" href="#tests">Volver a tests</a>`
+    : `<button class="${missedCount ? 'secondary-button' : 'primary-button'}" type="button" id="retry-quiz">Repetir test ${ICONS.arrow}</button><button class="secondary-button ai-accent-button" type="button" id="gen-another-quiz">${ICONS.sparkle} Generar otro test IA</button><a class="secondary-button" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">Volver al temario</a>`;
+
+  $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${isReview ? ICONS.target : ICONS.check}</span><p class="eyebrow">${isReview ? 'REPASO COMPLETADO' : `TEST COMPLETADO · ${escapeHtml(section.name)}`}</p><h2>${score} de ${order.length} correctas</h2><p>${message}</p><div class="result-score">${percentage}%</div>${note}<div class="result-buttons">${missedButton}${otherButtons}</div></section>`;
+
+  $('#review-missed')?.addEventListener('click', () => {
+    const questions = missed.map((q) => ({ ...q, origin: q.origin || `${subject.name} · ${section.name}` }));
+    launchReviewQuiz(questions, isReview ? reviewSubjectId : subject.id);
+  });
   $('#retry-quiz')?.addEventListener('click', () => startQuiz(subject.id, topic.id, section.id));
   $('#gen-another-quiz')?.addEventListener('click', () => openGenerateQuizModal(subject.id, topic.id));
+}
+
+/* ============================================================================
+ * REPASO DE FALLOS
+ * ============================================================================ */
+
+function reviewBanner(mistakes = [], subjectId = '') {
+  if (!dataService.isLoggedIn()) return '';
+  const list = subjectId ? mistakes.filter((m) => m.subjectId === subjectId) : mistakes;
+  if (!list.length) return '';
+  const n = list.length;
+  return `<section class="review-banner"><span class="review-icon">${ICONS.target}</span><div class="banner-copy"><strong>Tienes ${n} ${n === 1 ? 'pregunta fallada pendiente' : 'preguntas falladas pendientes'} de repasar</strong><span>Cuando aciertes una en el repaso, desaparece de tu lista. Se sincroniza en todos tus dispositivos.</span></div><div class="test-actions"><button class="secondary-button" type="button" data-clear-mistakes data-subject="${escapeHtml(subjectId)}">Vaciar lista</button><a class="primary-button" href="#repaso${subjectId ? `/${encodeURIComponent(subjectId)}` : ''}">Repasar mis fallos ${ICONS.arrow}</a></div></section>`;
+}
+
+function launchReviewQuiz(questions, subjectId = '', title = 'Repaso de fallos') {
+  activeQuiz = {
+    mode: 'review',
+    reviewSubjectId: subjectId,
+    subject: { id: subjectId, name: 'Repaso' },
+    topic: { id: '', name: title },
+    section: { id: 'repaso', name: title, questions },
+    order: [...questions.keys()],
+    index: 0,
+    score: 0,
+    selected: null,
+    complete: false,
+    missed: []
+  };
+  renderQuiz();
+}
+
+async function startReview(subjectId = '') {
+  activeQuiz = null;
+  setNavigation('tests', 'Repaso de fallos');
+  if (!dataService.isLoggedIn()) {
+    $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${ICONS.target}</span><p class="eyebrow">REPASO DE FALLOS</p><h2>Inicia sesión para guardar tus fallos</h2><p>Tus preguntas falladas se guardan en tu cuenta y puedes repasarlas desde cualquier dispositivo.</p><div class="result-buttons"><button class="primary-button" type="button" id="review-login">Iniciar sesión ${ICONS.arrow}</button><a class="secondary-button" href="#tests">Volver a tests</a></div></section>`;
+    $('#review-login')?.addEventListener('click', openProfile);
+    return;
+  }
+  renderLoading('Cargando tus preguntas falladas...');
+  try {
+    const all = await dataService.getMistakes(true);
+    const list = subjectId ? all.filter((m) => m.subjectId === subjectId) : all;
+    if (!list.length) {
+      showToast('No tienes preguntas falladas pendientes.');
+      location.hash = subjectId ? `#tests/${encodeURIComponent(subjectId)}` : '#tests';
+      return;
+    }
+    // Ya vienen ordenadas: primero las que más veces has fallado
+    launchReviewQuiz(list.slice(0, 30).map((m) => m.question), subjectId);
+  } catch (err) {
+    console.error('Error cargando el repaso de fallos:', err);
+    showToast(err.message || 'No se pudieron cargar tus fallos.', 4500);
+    renderTests(subjectId);
+  }
 }
 
 async function renderRoute() {
@@ -230,6 +342,7 @@ async function renderRoute() {
   if (parts[0] === 'temario') return renderTopic(parts[1], parts[2]);
   if (parts[0] === 'tests') return renderTests(parts[1]);
   if (parts[0] === 'test') return startQuiz(parts[1], parts[2], parts[3]);
+  if (parts[0] === 'repaso') return startReview(parts[1] || '');
   return renderHome();
 }
 
@@ -242,9 +355,22 @@ $('#today-label').textContent = formatDate();
 function updateProfileLabels() {
   const name = dataService.readProfile().name?.trim() || 'Mi espacio';
   $('#sidebar-profile-name').textContent = name;
+  const user = dataService.getUser();
+  $('#sidebar-profile-status').textContent = dataService.isLoggedIn() ? (user?.email || 'Sesión iniciada') : 'Perfil local';
   document.querySelectorAll('.profile-initial').forEach((node) => {
     node.textContent = name === 'Mi espacio' ? 'E' : name.charAt(0).toLocaleUpperCase('es');
   });
+}
+
+function renderAccountState() {
+  const loggedIn = dataService.isLoggedIn();
+  $('#account-box').hidden = !dataService.isAuthAvailable();
+  $('#account-signed-out').hidden = loggedIn;
+  $('#account-signed-in').hidden = !loggedIn;
+  $('#account-email').textContent = loggedIn ? (dataService.getUser()?.email || '') : '';
+  $('#profile-storage-note').textContent = loggedIn
+    ? 'Tu nombre, tus notas y tus fallos se guardan en tu cuenta y se sincronizan entre dispositivos.'
+    : 'Sin sesión, el nombre y el historial se guardan solo en este navegador.';
 }
 
 function setTheme(theme) {
@@ -265,6 +391,7 @@ function openProfile() {
   const correct = scores.reduce((sum, score) => sum + (Number(score.score) || 0), 0);
   const average = attempts ? Math.round(scores.reduce((sum, score) => sum + (Number(score.percentage) || 0), 0) / attempts) : 0;
   $('#profile-stats').innerHTML = `<article><strong>${attempts}</strong><span>tests completados</span></article><article><strong>${attempts ? `${average}%` : '—'}</strong><span>media de aciertos</span></article><article><strong>${questions ? `${correct}/${questions}` : '—'}</strong><span>respuestas correctas</span></article>`;
+  renderAccountState();
   modal.hidden = false;
   $('#profile-name-input').focus();
 }
@@ -445,6 +572,44 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+$('#login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const email = $('#login-email').value.trim();
+  if (!email) return;
+  const button = $('#login-submit');
+  button.disabled = true;
+  button.textContent = 'Enviando...';
+  try {
+    await dataService.sendMagicLink(email);
+    showToast(`Te hemos enviado un enlace a ${email}. Ábrelo en este mismo navegador para entrar.`, 7000);
+  } catch (err) {
+    showToast(err.message || 'No se pudo enviar el enlace de acceso.', 5000);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Enviar enlace';
+  }
+});
+
+$('#logout-button').addEventListener('click', async () => {
+  await dataService.signOut();
+  closeProfile();
+  updateProfileLabels();
+  showToast('Sesión cerrada.');
+  renderRoute();
+});
+
 try { setTheme(localStorage.getItem(THEME_KEY) || 'dark'); } catch { setTheme('dark'); }
+
+// Recoge la sesión si venimos del enlace mágico del email (antes de enrutar)
+const authResult = await dataService.initAuth().catch((err) => {
+  console.warn('No se pudo inicializar la sesión:', err);
+  return {};
+});
+if (authResult?.error) {
+  showToast(`No se pudo iniciar sesión: ${authResult.error}`, 6000);
+} else if (authResult?.signedIn) {
+  showToast(`Sesión iniciada como ${dataService.getUser()?.email || ''}.`, 4000);
+}
+
 updateProfileLabels();
 renderRoute();

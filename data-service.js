@@ -53,6 +53,101 @@ const GENERATED_SECTIONS_KEY = 'cuaderno.generated-sections.v1';
 let catalogCache = null;
 const topicDetailsCache = new Map();
 
+/* ============================================================================
+ * SESIÓN DE USUARIO (Supabase Auth vía REST, sin dependencias)
+ * ============================================================================ */
+const AUTH_KEY = 'cuaderno.auth.v1';
+let session = loadSession();
+let refreshPromise = null;
+let remoteScores = null;   // notas del usuario cargadas desde Supabase
+let remoteProfile = null;  // perfil del usuario cargado desde Supabase
+let mistakesCache = null;  // fallos del usuario cargados desde Supabase
+
+function loadSession() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSession(next) {
+  session = next;
+  try {
+    if (next) localStorage.setItem(AUTH_KEY, JSON.stringify(next));
+    else localStorage.removeItem(AUTH_KEY);
+  } catch {
+    // La sesión sigue activa en memoria durante esta visita
+  }
+}
+
+function sessionFromTokens(data, fallbackUser = null) {
+  const expiresAt = data.expires_at
+    ? Number(data.expires_at)
+    : Math.floor(Date.now() / 1000) + Number(data.expires_in || 3600);
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: expiresAt,
+    user: data.user ? { id: data.user.id, email: data.user.email } : fallbackUser
+  };
+}
+
+async function authFetch(path, { method = 'GET', body, token } = {}) {
+  const response = await fetch(`${SUPABASE_CONFIG.url.replace(/\/$/, '')}/auth/v1/${path}`, {
+    method,
+    headers: {
+      'apikey': SUPABASE_CONFIG.anonKey,
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!response.ok) {
+    const error = new Error(data?.msg || data?.error_description || data?.message || `Error de autenticación (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Devuelve un access token válido (renovándolo si está a punto de caducar) o null si no hay sesión.
+ */
+async function getValidAccessToken() {
+  if (!session?.access_token) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (session.expires_at && session.expires_at - 60 > now) return session.access_token;
+  if (!session.refresh_token) {
+    storeSession(null);
+    return null;
+  }
+  // Una sola renovación a la vez: Supabase rota el refresh token en cada uso
+  if (!refreshPromise) {
+    refreshPromise = authFetch('token?grant_type=refresh_token', {
+      method: 'POST',
+      body: { refresh_token: session.refresh_token }
+    })
+      .then((data) => {
+        storeSession(sessionFromTokens(data, session?.user || null));
+        return session.access_token;
+      })
+      .catch((err) => {
+        console.warn('No se pudo renovar la sesión:', err);
+        // Solo cerramos la sesión si Supabase la rechaza (no por fallos de red)
+        if ([400, 401, 403].includes(err.status)) storeSession(null);
+        return null;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
 /**
  * Convierte un ArrayBuffer a Base64 en bloques para evitar desbordamiento de pila en PDFs grandes.
  */
@@ -164,10 +259,15 @@ function mergeLocalSectionsIntoTopicDetails(subjectId, topicId, topicData) {
 }
 
 /**
- * Actualiza las cachés en memoria y el respaldo local con una nueva sección generada.
+ * Actualiza las cachés en memoria con una nueva sección generada.
+ * Si se subió a Supabase, se invalida el detalle del tema para recargarlo desde la BD
+ * (así las preguntas llegan con su `id` y se pueden guardar como fallos).
+ * Si no, se guarda una copia local como respaldo.
  */
-function registerNewSectionInCaches(subjectId, topicId, newSection) {
-  saveLocalGeneratedSection(subjectId, topicId, newSection);
+function registerNewSectionInCaches(subjectId, topicId, newSection, uploadedToSupabase = false) {
+  if (!uploadedToSupabase) {
+    saveLocalGeneratedSection(subjectId, topicId, newSection);
+  }
 
   if (catalogCache) {
     const cachedSub = catalogCache.find((s) => s.id === subjectId);
@@ -183,7 +283,9 @@ function registerNewSectionInCaches(subjectId, topicId, newSection) {
   }
 
   const cacheKey = `${subjectId}/${topicId}`;
-  if (topicDetailsCache.has(cacheKey)) {
+  if (uploadedToSupabase) {
+    topicDetailsCache.delete(cacheKey);
+  } else if (topicDetailsCache.has(cacheKey)) {
     const cachedDetails = topicDetailsCache.get(cacheKey);
     if (cachedDetails && Array.isArray(cachedDetails.sections) && !cachedDetails.sections.some((s) => s.id === newSection.id)) {
       cachedDetails.sections.push(newSection);
@@ -199,9 +301,10 @@ async function supabaseFetch(table, params = '', options = {}) {
     throw new Error('Supabase no está configurado. Revisa SUPABASE_CONFIG en config.js o data-service.js');
   }
   const endpoint = `${SUPABASE_CONFIG.url.replace(/\/$/, '')}/rest/v1/${table}${params ? `?${params}` : ''}`;
+  const token = await getValidAccessToken();
   const headers = {
     'apikey': SUPABASE_CONFIG.anonKey,
-    'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+    'Authorization': `Bearer ${token || SUPABASE_CONFIG.anonKey}`,
     'Content-Type': 'application/json',
     ...(options.headers || {})
   };
@@ -325,7 +428,7 @@ export const dataService = {
       try {
         const sectionsData = await supabaseFetch(
           'sections',
-          `subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&select=id,name,description,display_order,questions(question,options,answer,explanation,display_order)&order=display_order.asc`
+          `subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&select=id,name,description,display_order,questions(id,question,options,answer,explanation,display_order)&order=display_order.asc`
         );
         if (Array.isArray(sectionsData) && sectionsData.length > 0) {
           const topicData = mergeLocalSectionsIntoTopicDetails(subjectId, topicId, {
@@ -550,7 +653,7 @@ export const dataService = {
       if (contentType.includes('application/json')) {
         const fnData = await fnResp.json();
         if (fnResp.ok && fnData?.section) {
-          registerNewSectionInCaches(subjectId, topicId, fnData.section);
+          registerNewSectionInCaches(subjectId, topicId, fnData.section, Boolean(fnData.uploadedToSupabase));
           return {
             subject,
             topic,
@@ -708,8 +811,6 @@ export const dataService = {
       questions: normalizedQuestions
     };
 
-    registerNewSectionInCaches(subjectId, topicId, newSection);
-
     // Subir a Supabase
     onProgress('Subiendo el nuevo test a la base de datos en Supabase...');
     let uploadedToSupabase = false;
@@ -727,6 +828,8 @@ export const dataService = {
       supabaseWarning = 'Modo estático activo (configura SUPABASE_URL y SUPABASE_ANON_KEY para sincronizar en la nube).';
     }
 
+    registerNewSectionInCaches(subjectId, topicId, newSection, uploadedToSupabase);
+
     return {
       subject,
       topic,
@@ -737,9 +840,286 @@ export const dataService = {
   },
 
   /**
+   * Autenticación y sesión multi-dispositivo (Supabase Auth)
+   */
+  isAuthAvailable() {
+    return Boolean(SUPABASE_CONFIG.enabled && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey);
+  },
+
+  isLoggedIn() {
+    return Boolean(session?.access_token && session?.user?.id);
+  },
+
+  getUser() {
+    return session?.user || null;
+  },
+
+  async initAuth() {
+    if (!this.isAuthAvailable()) return { signedIn: false };
+
+    let signedInFromLink = false;
+    // Comprobar si la URL trae tokens del enlace mágico (#access_token=... o ?token_hash=...)
+    const hashStr = location.hash.startsWith('#') ? location.hash.slice(1) : '';
+    if (hashStr.includes('access_token=') || hashStr.includes('error_description=')) {
+      const params = new URLSearchParams(hashStr);
+      const errDesc = params.get('error_description');
+      if (errDesc) {
+        history.replaceState(null, '', location.pathname + location.search + '#inicio');
+        return { signedIn: false, error: errDesc };
+      }
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (accessToken && refreshToken) {
+        const user = await authFetch('user', { token: accessToken });
+        storeSession(
+          sessionFromTokens(
+            {
+              access_token: accessToken,
+              refresh_token: refreshToken,
+              expires_in: params.get('expires_in') || 3600,
+              expires_at: params.get('expires_at'),
+              user
+            },
+            user
+          )
+        );
+        signedInFromLink = true;
+        history.replaceState(null, '', location.pathname + location.search + '#inicio');
+      }
+    }
+
+    const urlParams = new URLSearchParams(location.search);
+    const tokenHash = urlParams.get('token_hash');
+    const verifyType = urlParams.get('type') || 'magiclink';
+    if (tokenHash) {
+      try {
+        const data = await authFetch('verify', {
+          method: 'POST',
+          body: { token_hash: tokenHash, type: verifyType }
+        });
+        if (data?.access_token) {
+          storeSession(sessionFromTokens(data, data.user));
+          signedInFromLink = true;
+        }
+        history.replaceState(null, '', location.pathname + (location.hash || '#inicio'));
+      } catch (err) {
+        history.replaceState(null, '', location.pathname + (location.hash || '#inicio'));
+        return { signedIn: false, error: err.message };
+      }
+    }
+
+    const validToken = await getValidAccessToken();
+    if (!validToken) {
+      remoteScores = null;
+      remoteProfile = null;
+      mistakesCache = null;
+      return { signedIn: false };
+    }
+
+    if (!session?.user?.id) {
+      try {
+        const user = await authFetch('user', { token: validToken });
+        storeSession({ ...session, user: { id: user.id, email: user.email } });
+      } catch {
+        // continuar con la sesión actual
+      }
+    }
+
+    await this.syncUserData();
+    return { signedIn: signedInFromLink };
+  },
+
+  async syncUserData() {
+    if (!this.isLoggedIn()) return;
+    const userId = session.user.id;
+    try {
+      const [scoresRows, profileRows] = await Promise.all([
+        supabaseFetch(
+          'quiz_scores',
+          `user_id=eq.${encodeURIComponent(userId)}&select=subject,section,score,total,percentage,created_at&order=created_at.desc&limit=40`
+        ).catch(() => null),
+        supabaseFetch(
+          'student_profiles',
+          `id=eq.${encodeURIComponent(userId)}&select=name`
+        ).catch(() => null)
+      ]);
+      if (Array.isArray(scoresRows)) {
+        remoteScores = scoresRows.map((r) => ({
+          subject: r.subject,
+          section: r.section,
+          score: r.score,
+          total: r.total,
+          percentage: r.percentage,
+          date: r.created_at
+        }));
+      }
+      if (Array.isArray(profileRows) && profileRows[0]?.name) {
+        remoteProfile = { name: profileRows[0].name };
+      }
+    } catch (err) {
+      console.warn('No se pudieron sincronizar los datos del usuario:', err);
+    }
+  },
+
+  async sendMagicLink(email) {
+    if (!this.isAuthAvailable()) {
+      throw new Error('Supabase no está configurado.');
+    }
+    const redirectTo = `${location.origin}${location.pathname}`;
+    await authFetch(`otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: 'POST',
+      body: {
+        email: email.trim(),
+        create_user: true,
+        options: { emailRedirectTo: redirectTo }
+      }
+    });
+  },
+
+  async signOut() {
+    const token = session?.access_token;
+    storeSession(null);
+    remoteScores = null;
+    remoteProfile = null;
+    mistakesCache = null;
+    if (token && this.isAuthAvailable()) {
+      await authFetch('logout', { method: 'POST', token }).catch(() => {});
+    }
+  },
+
+  /**
+   * Banco de preguntas falladas en Supabase (`student_mistakes`)
+   */
+  async getMistakes(forceRefresh = false) {
+    if (!this.isLoggedIn() || !this.isAuthAvailable()) {
+      return [];
+    }
+    if (mistakesCache && !forceRefresh) {
+      return mistakesCache;
+    }
+
+    const userId = session.user.id;
+    const [rows, catalog] = await Promise.all([
+      supabaseFetch(
+        'student_mistakes',
+        `user_id=eq.${encodeURIComponent(userId)}&select=question_id,fail_count,last_failed_at,questions(id,subject_id,topic_id,section_id,question,options,answer,explanation)&order=fail_count.desc,last_failed_at.desc`
+      ),
+      this.getCatalog()
+    ]);
+
+    const subjectMap = new Map(catalog.map((s) => [s.id, s]));
+
+    mistakesCache = (rows || [])
+      .filter((r) => r.questions && r.questions.id)
+      .map((r) => {
+        const q = r.questions;
+        const sub = subjectMap.get(q.subject_id);
+        const top = sub?.topics?.find((t) => t.id === q.topic_id);
+        const sec = top?.sections?.find((s) => s.id === q.section_id);
+        const origin = [sub?.name || q.subject_id, sec?.name || top?.name || q.topic_id]
+          .filter(Boolean)
+          .join(' · ');
+        return {
+          questionId: r.question_id,
+          subjectId: q.subject_id,
+          topicId: q.topic_id,
+          sectionId: q.section_id,
+          failCount: r.fail_count || 1,
+          lastFailedAt: r.last_failed_at,
+          question: {
+            id: q.id,
+            question: q.question,
+            options: q.options,
+            answer: q.answer,
+            explanation: q.explanation || '',
+            origin
+          }
+        };
+      });
+
+    return mistakesCache;
+  },
+
+  async recordMistake(question) {
+    if (!this.isLoggedIn() || !this.isAuthAvailable() || !question?.id) {
+      return;
+    }
+    const userId = session.user.id;
+    const existing = mistakesCache?.find((m) => m.questionId === question.id);
+    const nextCount = (existing?.failCount || 0) + 1;
+    const nowIso = new Date().toISOString();
+
+    await supabaseFetch('student_mistakes', 'on_conflict=user_id,question_id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: {
+        user_id: userId,
+        question_id: question.id,
+        fail_count: nextCount,
+        last_failed_at: nowIso
+      }
+    });
+
+    mistakesCache = null;
+  },
+
+  async resolveMistake(questionId) {
+    if (!this.isLoggedIn() || !this.isAuthAvailable() || !questionId) {
+      return;
+    }
+    const userId = session.user.id;
+    await supabaseFetch(
+      'student_mistakes',
+      `user_id=eq.${encodeURIComponent(userId)}&question_id=eq.${encodeURIComponent(questionId)}`,
+      {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      }
+    );
+    if (mistakesCache) {
+      mistakesCache = mistakesCache.filter((m) => m.questionId !== questionId);
+    }
+  },
+
+  async clearMistakes(subjectId = '') {
+    if (!this.isLoggedIn() || !this.isAuthAvailable()) {
+      return;
+    }
+    const userId = session.user.id;
+    if (!subjectId) {
+      await supabaseFetch('student_mistakes', `user_id=eq.${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      });
+      mistakesCache = [];
+      return;
+    }
+
+    const current = await this.getMistakes();
+    const idsToDelete = current.filter((m) => m.subjectId === subjectId).map((m) => m.questionId);
+    if (!idsToDelete.length) return;
+
+    const filterList = idsToDelete.map((id) => encodeURIComponent(id)).join(',');
+    await supabaseFetch(
+      'student_mistakes',
+      `user_id=eq.${encodeURIComponent(userId)}&question_id=in.(${filterList})`,
+      {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      }
+    );
+    if (mistakesCache) {
+      mistakesCache = mistakesCache.filter((m) => m.subjectId !== subjectId);
+    }
+  },
+
+  /**
    * Métricas y Puntuaciones
    */
   readScores() {
+    if (this.isLoggedIn() && Array.isArray(remoteScores)) {
+      return remoteScores;
+    }
     try {
       return JSON.parse(localStorage.getItem(SCORE_KEY)) || [];
     } catch {
@@ -748,32 +1128,31 @@ export const dataService = {
   },
 
   async saveScore(score) {
+    if (this.isLoggedIn() && Array.isArray(remoteScores)) {
+      remoteScores.unshift(score);
+    }
     try {
-      const scores = this.readScores();
+      const scores = JSON.parse(localStorage.getItem(SCORE_KEY)) || [];
       scores.unshift(score);
       localStorage.setItem(SCORE_KEY, JSON.stringify(scores.slice(0, 40)));
     } catch (err) {
       console.error('Error guardando en localStorage:', err);
     }
 
-    // Si Supabase está activado, sincroniza la puntuación remotamente
+    // Si Supabase está activado, sincroniza la puntuación remotamente (asociada al user_id si hay sesión)
     if (SUPABASE_CONFIG.enabled && SUPABASE_CONFIG.url) {
       try {
-        await fetch(`${SUPABASE_CONFIG.url.replace(/\/$/, '')}/rest/v1/quiz_scores`, {
+        await supabaseFetch('quiz_scores', '', {
           method: 'POST',
-          headers: {
-            'apikey': SUPABASE_CONFIG.anonKey,
-            'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
+          headers: { Prefer: 'return=minimal' },
+          body: {
+            user_id: session?.user?.id || null,
             subject: score.subject,
             section: score.section,
             score: score.score,
             total: score.total,
             percentage: score.percentage
-          })
+          }
         });
       } catch (err) {
         console.warn('No se pudo guardar la puntuación en Supabase:', err);
@@ -785,6 +1164,9 @@ export const dataService = {
    * Perfil de estudiante
    */
   readProfile() {
+    if (this.isLoggedIn() && remoteProfile?.name) {
+      return remoteProfile;
+    }
     try {
       return JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: '' };
     } catch {
@@ -793,6 +1175,19 @@ export const dataService = {
   },
 
   saveProfile(name) {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: name.trim() }));
+    const clean = name.trim();
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean }));
+    if (this.isLoggedIn() && this.isAuthAvailable()) {
+      remoteProfile = { name: clean };
+      supabaseFetch('student_profiles', 'on_conflict=id', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: {
+          id: session.user.id,
+          name: clean,
+          updated_at: new Date().toISOString()
+        }
+      }).catch((err) => console.warn('No se pudo sincronizar el perfil en Supabase:', err));
+    }
   }
 };

@@ -69,6 +69,14 @@ create table if not exists student_profiles (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+create table if not exists student_mistakes (
+  user_id uuid references auth.users(id) on delete cascade not null,
+  question_id uuid references questions(id) on delete cascade not null,
+  fail_count integer default 1 not null,
+  last_failed_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (user_id, question_id)
+);
+
 -- 3. Habilitar Row Level Security (RLS)
 alter table subjects enable row level security;
 alter table topics enable row level security;
@@ -76,23 +84,40 @@ alter table sections enable row level security;
 alter table questions enable row level security;
 alter table quiz_scores enable row level security;
 alter table student_profiles enable row level security;
+alter table student_mistakes enable row level security;
 
 -- 4. Políticas de lectura pública para el contenido educativo
+drop policy if exists "Lectura pública para subjects" on subjects;
 create policy "Lectura pública para subjects" on subjects for select using (true);
+
+drop policy if exists "Lectura pública para topics" on topics;
 create policy "Lectura pública para topics" on topics for select using (true);
+
+drop policy if exists "Lectura pública para sections" on sections;
 create policy "Lectura pública para sections" on sections for select using (true);
+
+drop policy if exists "Lectura pública para questions" on questions;
 create policy "Lectura pública para questions" on questions for select using (true);
 
 -- Políticas de inserción para tests generados con IA desde la web
+drop policy if exists "Inserción pública para sections" on sections;
 create policy "Inserción pública para sections" on sections for insert with check (true);
+
+drop policy if exists "Inserción pública para questions" on questions;
 create policy "Inserción pública para questions" on questions for insert with check (true);
 
--- Políticas para puntuaciones y perfiles
+-- Políticas para puntuaciones, perfiles y banco de fallos
+drop policy if exists "Usuarios gestionan sus propias notas" on quiz_scores;
 create policy "Usuarios gestionan sus propias notas" on quiz_scores
   for all using (auth.uid() = user_id or user_id is null);
 
+drop policy if exists "Usuarios gestionan su perfil" on student_profiles;
 create policy "Usuarios gestionan su perfil" on student_profiles
   for all using (auth.uid() = id);
+
+drop policy if exists "Usuarios gestionan sus propios fallos" on student_mistakes;
+create policy "Usuarios gestionan sus propios fallos" on student_mistakes
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ==============================================================================
 -- 5. Inserción de datos iniciales (Geografía Física - Tema 1)

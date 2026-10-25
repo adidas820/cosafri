@@ -67,3 +67,22 @@
 .ai-accent-button:hover{background:var(--accent-soft)!important;border-color:var(--accent)!important}
 :root[data-theme="light"] .ai-accent-button{color:var(--accent-2)!important}
 @media(max-width:560px){.gen-form-row{grid-template-columns:1fr}.question-count-controls{flex-direction:column;align-items:stretch}.question-count-controls input[type="number"]{width:100%}}
+
+
+/* Review Mistakes Banner & Multi-device Account Styles */
+.review-banner{margin:0 0 18px;border:1px solid color-mix(in srgb,var(--red) 45%,var(--line));border-radius:8px;background:linear-gradient(110deg,var(--red-soft),var(--panel) 78%);padding:15px 17px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+:root[data-theme="light"] .review-banner{background:linear-gradient(110deg,#fef2f2,#ffffff 78%);border-color:#fca5a5}
+.review-icon{width:36px;height:36px;border-radius:9px;background:var(--red-soft);color:var(--red);display:grid;place-items:center;flex:none}
+.review-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.review-banner .banner-copy{flex:1;min-width:0}
+.result-note{font-size:10px;color:var(--muted);margin:-6px 0 16px}
+.account-box{margin:0 0 18px;padding:13px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)}
+:root[data-theme="light"] .account-box{background:#f8f9fb}
+.account-title{font:700 10px var(--display);text-transform:uppercase;letter-spacing:.9px;color:var(--accent);margin:0 0 5px}
+:root[data-theme="light"] .account-title{color:var(--accent-2)}
+.account-text{font-size:10px;color:var(--muted);margin:0 0 10px;line-height:1.5}
+.account-form{display:flex;gap:8px}
+.account-form input{flex:1;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);padding:8px 10px;font:12px var(--sans);outline:none}
+.account-form input:focus{border-color:var(--accent)}
+:root[data-theme="light"] .account-form input{background:#ffffff}
+@media(max-width:760px){.review-banner{flex-direction:column;align-items:flex-start}.account-form{flex-direction:column}}
