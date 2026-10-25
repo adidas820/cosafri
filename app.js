@@ -32,7 +32,10 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 2600);
 }
 
-function iconTile(icon = ICONS.folder) { return `<span class="subject-art">${icon}</span>`; }
+function iconTile(icon = ICONS.folder, color = '') {
+  const colorAttr = color ? ` data-color="${escapeHtml(color)}"` : '';
+  return `<span class="subject-art"${colorAttr}>${icon}</span>`;
+}
 
 function renderLoading(message = 'Cargando...') {
   $('#page-content').innerHTML = `<div class="loading-state"><div class="loading-spinner" aria-hidden="true"></div><p class="loading-text">${escapeHtml(message)}</p></div>`;
@@ -60,14 +63,14 @@ function setNavigation(section, label) {
 async function renderSidebar() {
   const catalog = await dataService.getCatalog();
   $('#subject-count').textContent = catalog.length;
-  $('#subject-list').innerHTML = catalog.map((subject) => `<a class="subject-row" href="#asignatura/${encodeURIComponent(subject.id)}"><span class="subject-dot"></span><span>${escapeHtml(subject.name)}</span></a>`).join('');
+  $('#subject-list').innerHTML = catalog.map((subject) => `<a class="subject-row" href="#asignatura/${encodeURIComponent(subject.id)}"><span class="subject-dot" data-color="${escapeHtml(subject.color || '')}"></span><span>${escapeHtml(subject.name)}</span></a>`).join('');
 }
 
 function subjectCard(subject) {
   const topicCount = subject.topics.length;
   const sectionCount = subject.topics.reduce((sum, topic) => sum + topic.sections.length, 0);
   const questionCount = subject.topics.reduce((sum, topic) => sum + topic.sections.reduce((sectionSum, section) => sectionSum + (section.questionCount || section.questions?.length || 0), 0), 0);
-  return `<article class="subject-card"><div class="subject-card-top">${iconTile()}<div><h3>${escapeHtml(subject.name)}</h3><p>${escapeHtml(subject.description)}</p></div></div><div class="subject-card-meta"><span>${topicCount} ${topicCount === 1 ? 'temario' : 'temarios'}</span><span>${sectionCount} tests</span><span>${questionCount} preguntas</span></div><div class="subject-card-actions"><a class="primary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Abrir asignatura ${ICONS.arrow}</a><a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Ver tests</a></div></article>`;
+  return `<article class="subject-card" data-color="${escapeHtml(subject.color || '')}"><div class="subject-card-top">${iconTile(ICONS.folder, subject.color)}<div><h3>${escapeHtml(subject.name)}</h3><p>${escapeHtml(subject.description)}</p></div></div><div class="subject-card-meta"><span>${topicCount} ${topicCount === 1 ? 'temario' : 'temarios'}</span><span>${sectionCount} tests</span><span>${questionCount} preguntas</span></div><div class="subject-card-actions"><a class="primary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Abrir asignatura ${ICONS.arrow}</a><a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Ver tests</a></div></article>`;
 }
 
 async function renderHome() {
@@ -93,7 +96,7 @@ async function renderSubjects() {
   setNavigation('subjects');
   renderLoading('Cargando asignaturas...');
   const catalog = await dataService.getCatalog();
-  $('#page-content').innerHTML = `<section class="page-title"><p class="eyebrow">TODO TU MATERIAL, EN SU SITIO</p><h1>Asignaturas</h1><p>Despliega una asignatura para ver sus temarios y los tests disponibles en cada uno.</p></section><div class="subject-list-accordion">${catalog.map((subject) => `<details class="subject-accordion" open><summary><span class="summary-left">${iconTile()}<span class="summary-title"><strong>${escapeHtml(subject.name)}</strong><span>${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index)).join('')}</div></details>`).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="page-title"><p class="eyebrow">TODO TU MATERIAL, EN SU SITIO</p><h1>Asignaturas</h1><p>Despliega una asignatura para ver sus temarios y los tests disponibles en cada uno.</p></section><div class="subject-list-accordion">${catalog.map((subject) => `<details class="subject-accordion" open><summary><span class="summary-left">${iconTile(ICONS.folder, subject.color)}<span class="summary-title"><strong>${escapeHtml(subject.name)}</strong><span>${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index)).join('')}</div></details>`).join('')}</div>`;
 }
 
 async function renderSubject(subjectId) {
