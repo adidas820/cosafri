@@ -1,6 +1,8 @@
 import { catalog } from './study-data.js';
 
 const SCORE_KEY = 'cuaderno.quiz-scores.v1';
+const PROFILE_KEY = 'cuaderno.profile.v1';
+const THEME_KEY = 'cuaderno.theme.v1';
 const $ = (selector) => document.querySelector(selector);
 const ICONS = {
   book: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5h13a2 2 0 0 1 2 2V21H6a2 2 0 0 1-2-2V4.5Z"/><path d="M4 17.5h15M8 8h7M8 12h7"/></svg>',
@@ -181,4 +183,50 @@ $('#nav-subjects').addEventListener('click', (event) => { event.preventDefault()
 $('#nav-tests').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#tests'; renderTests(); });
 window.addEventListener('hashchange', renderRoute);
 $('#today-label').textContent = formatDate();
+function readProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: '' }; }
+  catch { return { name: '' }; }
+}
+function updateProfileLabels() {
+  const name = readProfile().name?.trim() || 'Mi espacio';
+  $('#sidebar-profile-name').textContent = name;
+  document.querySelectorAll('.profile-initial').forEach((node) => { node.textContent = name === 'Mi espacio' ? 'E' : name.charAt(0).toLocaleUpperCase('es'); });
+}
+function setTheme(theme) {
+  const light = theme === 'light';
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  const toggle = $('#theme-toggle');
+  toggle.setAttribute('aria-label', light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro');
+  toggle.innerHTML = `<span class="theme-toggle-icon" aria-hidden="true">${light ? '☾' : '☀'}</span><span class="theme-toggle-label">Tema ${light ? 'oscuro' : 'claro'}</span>`;
+  try { localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch { /* El tema sigue activo durante esta visita. */ }
+}
+function openProfile() {
+  const modal = $('#profile-modal');
+  $('#profile-name-input').value = readProfile().name || '';
+  const scores = readScores();
+  const attempts = scores.length;
+  const questions = scores.reduce((sum, score) => sum + (Number(score.total) || 0), 0);
+  const correct = scores.reduce((sum, score) => sum + (Number(score.score) || 0), 0);
+  const average = attempts ? Math.round(scores.reduce((sum, score) => sum + (Number(score.percentage) || 0), 0) / attempts) : 0;
+  $('#profile-stats').innerHTML = `<article><strong>${attempts}</strong><span>tests completados</span></article><article><strong>${attempts ? `${average}%` : '—'}</strong><span>media de aciertos</span></article><article><strong>${questions ? `${correct}/${questions}` : '—'}</strong><span>respuestas correctas</span></article>`;
+  modal.hidden = false;
+  $('#profile-name-input').focus();
+}
+function closeProfile() { $('#profile-modal').hidden = true; }
+$('#theme-toggle').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
+$('#open-profile').addEventListener('click', openProfile);
+$('#open-profile-top').addEventListener('click', openProfile);
+$('#close-profile').addEventListener('click', closeProfile);
+$('#profile-modal').addEventListener('click', (event) => { if (event.target.id === 'profile-modal') closeProfile(); });
+$('#save-profile').addEventListener('click', () => {
+  const name = $('#profile-name-input').value.trim();
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ name })); }
+  catch { showToast('No se pudo guardar el perfil en este navegador.'); return; }
+  updateProfileLabels();
+  closeProfile();
+  showToast('Perfil guardado.');
+});
+window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !$('#profile-modal').hidden) closeProfile(); });
+try { setTheme(localStorage.getItem(THEME_KEY) || 'dark'); } catch { setTheme('dark'); }
+updateProfileLabels();
 renderRoute();

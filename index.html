@@ -23,14 +23,24 @@
       </nav>
       <div class="sidebar-label subject-label">MIS ASIGNATURAS</div>
       <div class="subject-list" id="subject-list"></div>
-      <div class="sidebar-bottom"><div class="privacy-note"><span class="lock-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span><div><strong>Biblioteca del curso</strong><span>Contenido organizado desde el repositorio.</span></div></div><div class="profile"><div class="avatar">E</div><div class="profile-info"><strong>Mi espacio</strong><span>Estudiante</span></div><span class="online-dot"></span></div></div>
+      <div class="sidebar-bottom"><div class="privacy-note"><span class="lock-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span><div><strong>Biblioteca del curso</strong><span>Contenido organizado desde el repositorio.</span></div></div><button class="profile profile-button" id="open-profile" type="button" aria-label="Abrir perfil"><span class="avatar profile-initial">E</span><span class="profile-info"><strong id="sidebar-profile-name">Mi espacio</strong><span>Perfil local</span></span><span class="online-dot"></span></button></div>
     </aside>
     <main class="main-content">
-      <header class="topbar"><div class="breadcrumb"><span>Mi espacio</span><span class="crumb-slash">/</span><strong id="breadcrumb-current">Inicio</strong></div><div class="top-actions"><span class="today-label" id="today-label"></span><span class="avatar top-avatar">E</span></div></header>
+      <header class="topbar"><div class="breadcrumb"><span>Mi espacio</span><span class="crumb-slash">/</span><strong id="breadcrumb-current">Inicio</strong></div><div class="top-actions"><span class="today-label" id="today-label"></span><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar a tema claro"><span class="theme-toggle-icon" aria-hidden="true">☀</span><span class="theme-toggle-label">Tema claro</span></button><button class="avatar top-avatar profile-open-top profile-initial" id="open-profile-top" type="button" aria-label="Abrir perfil">E</button></div></header>
       <div class="page-content" id="page-content" aria-live="polite"></div>
     </main>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="modal-backdrop" id="profile-modal" hidden>
+    <section class="profile-modal panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <button class="modal-close" id="close-profile" type="button" aria-label="Cerrar perfil">×</button>
+      <p class="eyebrow">TU ESPACIO PERSONAL</p><h2 id="profile-title">Perfil de estudiante</h2>
+      <label class="profile-name-field">Nombre<input id="profile-name-input" type="text" maxlength="40" autocomplete="name" placeholder="¿Cómo te llamas?"></label>
+      <div class="profile-stats" id="profile-stats"></div>
+      <p class="profile-local-note">El nombre y el historial se guardan solo en este navegador.</p>
+      <button class="primary-button" id="save-profile" type="button">Guardar perfil</button>
+    </section>
+  </div>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
