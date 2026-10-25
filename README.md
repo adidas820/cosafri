@@ -1,28 +1,63 @@
 # Cuaderno
 
-Biblioteca estática de estudio para Netlify. La web no permite subir PDFs: asignaturas, temarios y cuestionarios se publican como archivos del repositorio.
+Biblioteca estática de estudio para Netlify y GitHub Pages. Diseñada para alojar temarios, apuntes en PDF y cuestionarios de autoevaluación con corrección y explicaciones inmediatas.
 
-## Estructura del contenido
+---
+
+## ⚡ Carga Diferida (Lazy Loading)
+
+Para mantener una carga inicial ultra rápida (< 2 KB), el contenido se divide en:
+- **`data/catalog.json`**: Metadatos ligeros de asignaturas, temarios y recuentos de preguntas. Es lo único que se descarga al abrir la web.
+- **`temas/<asignatura>/<tema>.json`**: Cuestionarios detallados (preguntas, opciones y explicaciones). Se cargan bajo demanda (*lazy loading*) solo cuando el estudiante entra a resolver ese test en particular, guardándose en caché en memoria.
 
 ```text
+data/
+  catalog.json                     # Catálogo global y resúmenes de asignaturas
 temas/
   geografia_fisica/
-    tema1.pdf
-study-data.js
+    tema1.pdf                      # PDF original del temario
+    tema1.json                     # Batería de preguntas y explicaciones (carga diferida)
+data-service.js                    # Capa de datos (Netlify / Supabase)
+app.js                             # Enrutador y lógica de la aplicación
+supabase-schema.sql                # Esquema SQL y seed de datos para Supabase
 ```
 
-- `temas/` guarda los PDFs originales y mantiene la separación por asignatura.
-- `study-data.js` define las asignaturas, los temarios que se muestran y los cuestionarios. Las preguntas, respuestas y explicaciones están escritas a partir de los apuntes.
-- `app.js` presenta la biblioteca, abre los PDFs y permite resolver los tests.
+---
 
-Para añadir otra asignatura, crea su carpeta dentro de `temas/`, añade los PDF al repositorio e incorpora sus metadatos y preguntas a `study-data.js`.
+## 🚀 Despliegue en Netlify
 
-## Desarrollo local
+El proyecto es 100% estático y compatible con Netlify:
+1. Conecta tu repositorio de GitHub en [Netlify](https://www.netlify.com/).
+2. Deja el **Build command** vacío (no requiere compilación).
+3. Establece el **Publish directory** en `.` (directorio raíz).
+4. Netlify desplegará automáticamente los PDFs y los archivos JSON estáticos con cada `git push`.
 
-Desde la carpeta del proyecto, ejecuta:
+---
+
+## 🗄️ Integración con Supabase (Opcional)
+
+Si en el futuro deseas utilizar una base de datos en PostgreSQL con Supabase en lugar de los archivos JSON estáticos:
+
+1. Crea un proyecto en [Supabase](https://supabase.com/).
+2. Entra al **SQL Editor** de Supabase y ejecuta el script [supabase-schema.sql](file:///c:/Users/User/Desktop/adi/cosafri/supabase-schema.sql). Creará automáticamente las tablas (`subjects`, `topics`, `sections`, `questions`, `quiz_scores`, `student_profiles`), configurará las políticas RLS y cargará los datos iniciales.
+3. Abre [data-service.js](file:///c:/Users/User/Desktop/adi/cosafri/data-service.js) y edita:
+   ```javascript
+   export const SUPABASE_CONFIG = {
+     url: 'https://tu-proyecto.supabase.co',
+     anonKey: 'tu-clave-anon-publica',
+     enabled: true // Activa el modo Supabase
+   };
+   ```
+4. ¡Listo! La web pasará a consultar Supabase en tiempo real sin requerir cambios en el diseño ni en la interfaz.
+
+---
+
+## 💻 Desarrollo Local
+
+Para probar la web en tu máquina:
 
 ```powershell
 python -m http.server 8000
 ```
 
-Abre [http://localhost:8000](http://localhost:8000). El mismo contenido funciona como sitio estático en Netlify.
+Abre [http://localhost:8000](http://localhost:8000) en tu navegador.

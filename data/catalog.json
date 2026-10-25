@@ -1,0 +1,44 @@
+[
+  {
+    "id": "geografia-fisica",
+    "name": "Geografía Física",
+    "folder": "temas/geografia_fisica",
+    "description": "La configuración natural de la Tierra y las relaciones entre sus sistemas.",
+    "color": "violet",
+    "topics": [
+      {
+        "id": "tema1",
+        "name": "Tema 1 · Campo científico y elementos de la Tierra",
+        "file": "temas/geografia_fisica/tema1.pdf",
+        "dataPath": "temas/geografia_fisica/tema1.json",
+        "pages": 3,
+        "sections": [
+          {
+            "id": "campo",
+            "name": "Campo científico y evolución",
+            "description": "Objeto de estudio, historia y figuras de la Geografía.",
+            "questionCount": 9
+          },
+          {
+            "id": "metodo",
+            "name": "Sistemas, método y datos",
+            "description": "Teoría de sistemas, fuentes, variables y tratamiento de datos.",
+            "questionCount": 10
+          },
+          {
+            "id": "tierra",
+            "name": "La Tierra y sus movimientos",
+            "description": "Sistema solar, forma terrestre, rotación, traslación y coordenadas.",
+            "questionCount": 9
+          },
+          {
+            "id": "magnitudes",
+            "name": "Magnitudes, escalas y diversidad",
+            "description": "Órdenes espacio-temporales, geodiversidad y biodiversidad.",
+            "questionCount": 8
+          }
+        ]
+      }
+    ]
+  }
+]
