@@ -119,6 +119,79 @@
       </form>
     </section>
   </div>
+  <div class="modal-backdrop" id="exam-modal" hidden>
+    <section class="profile-modal generate-modal panel" role="dialog" aria-modal="true" aria-labelledby="exam-modal-title">
+      <button class="modal-close" id="close-exam-modal" type="button" aria-label="Cerrar simulacro de examen">×</button>
+      <p class="eyebrow">SIMULACRO DE EXAMEN PERSONALIZADO</p>
+      <h2 id="exam-modal-title">Configurar examen</h2>
+      <p class="modal-subtitle">Elige la asignatura, marca los temas que entran en el examen, define la penalización por fallo y el límite de tiempo.</p>
+      <form id="exam-config-form" class="gen-quiz-form">
+        <label class="profile-name-field">
+          <span>Asignatura</span>
+          <select id="exam-subject-select" required></select>
+        </label>
+        <div class="profile-name-field">
+          <div class="exam-topics-header">
+            <span>Temarios que entran en el examen</span>
+            <div class="exam-topics-links">
+              <button type="button" class="back-link" id="exam-select-all-topics">Marcar todos</button>
+              <span>·</span>
+              <button type="button" class="back-link" id="exam-deselect-all-topics">Ninguno</button>
+            </div>
+          </div>
+          <div class="exam-topics-checklist" id="exam-topics-list"></div>
+          <span class="exam-available-note" id="exam-available-note">0 preguntas disponibles en los temas seleccionados</span>
+        </div>
+        <div class="profile-name-field">
+          <span>Número de preguntas del examen</span>
+          <div class="question-count-controls">
+            <input id="exam-question-count" type="number" min="1" max="200" value="20" required />
+            <div class="count-presets" id="exam-count-presets" role="group" aria-label="Preajustes de preguntas del examen">
+              <button type="button" class="preset-pill" data-exam-count="10">10</button>
+              <button type="button" class="preset-pill active" data-exam-count="20">20</button>
+              <button type="button" class="preset-pill" data-exam-count="30">30</button>
+              <button type="button" class="preset-pill" data-exam-count="40">40</button>
+              <button type="button" class="preset-pill" data-exam-count="all">Todas</button>
+            </div>
+          </div>
+        </div>
+        <div class="gen-form-row">
+          <label class="profile-name-field">
+            <span>Penalización por fallo</span>
+            <select id="exam-penalty-select">
+              <option value="0">Sin penalización (0)</option>
+              <option value="0.2">Cada 5 fallos resta 1 (-0,20)</option>
+              <option value="0.25">Cada 4 fallos resta 1 (-0,25)</option>
+              <option value="0.3333333" selected>Cada 3 fallos resta 1 (-0,33)</option>
+              <option value="0.5">Cada 2 fallos resta 1 (-0,50)</option>
+              <option value="1">Cada fallo resta 1 (-1,00)</option>
+              <option value="custom">Personalizado...</option>
+            </select>
+          </label>
+          <label class="profile-name-field">
+            <span>Temporizador</span>
+            <select id="exam-timer-select">
+              <option value="0">Sin límite de tiempo</option>
+              <option value="10">10 minutos</option>
+              <option value="15">15 minutos</option>
+              <option value="20" selected>20 minutos</option>
+              <option value="30">30 minutos</option>
+              <option value="45">45 minutos</option>
+              <option value="60">60 minutos</option>
+            </select>
+          </label>
+        </div>
+        <label class="profile-name-field" id="exam-custom-penalty-field" hidden>
+          <span>¿Cuánto resta cada pregunta fallada sobre 1 acierto? (ej.: 0.25 = un cuarto de punto)</span>
+          <input id="exam-penalty-custom" type="number" min="0" max="5" step="0.01" value="0.33" />
+        </label>
+        <div class="gen-modal-actions">
+          <button class="secondary-button" id="cancel-exam-modal" type="button">Cancelar</button>
+          <button class="primary-button" id="submit-exam-modal" type="submit">Comenzar examen</button>
+        </div>
+      </form>
+    </section>
+  </div>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

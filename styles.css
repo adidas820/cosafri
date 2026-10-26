@@ -148,3 +148,25 @@
 .admin-catalog-list{padding-top:14px}
 @media(max-width:900px){.admin-forms-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.admin-search-input{width:100%}.admin-user-row{align-items:flex-start;flex-direction:column}.admin-user-metrics{justify-content:flex-start}}
+
+/* Exam Simulation Modal & Results */
+#exam-custom-penalty-field[hidden]{display:none!important}
+.exam-topics-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.exam-topics-links{display:flex;align-items:center;gap:6px;font-size:10px}
+.exam-topics-checklist{display:grid;gap:6px;max-height:175px;overflow-y:auto;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+:root[data-theme="light"] .exam-topics-checklist{background:#ffffff}
+.exam-topic-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);cursor:pointer;font-size:11px;color:var(--ink)}
+.exam-topic-item:hover{border-color:var(--accent)}
+.exam-topic-item input[type="checkbox"]{accent-color:var(--accent-2);width:14px;height:14px;cursor:pointer;flex:none}
+.exam-topic-name{flex:1;min-width:0;font-weight:500}
+.exam-available-note{font-size:10px;color:var(--muted)}
+.exam-quiz-pills{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+. exam-quiz-pills .score-badge svg,.score-badge svg{width:12px;height:12px;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.quiz-feedback.is-blank{background:var(--panel-2)!important;border:1px solid var(--line);color:var(--ink)!important}
+.exam-grade-of{font-size:18px;font-weight:600;color:var(--muted)}
+.exam-result-breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 18px;text-align:center}
+.exam-result-breakdown article{display:grid;gap:3px;padding:11px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2)}
+:root[data-theme="light"] .exam-result-breakdown article{background:#f8f9fb}
+.exam-result-breakdown strong{font:700 14px var(--display);color:var(--ink)}
+.exam-result-breakdown span{font-size:9px;color:var(--muted)}
+@media(max-width:560px){.exam-result-breakdown{grid-template-columns:repeat(2,1fr)}}

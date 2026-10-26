@@ -20,6 +20,21 @@ const ICONS = {
 let activeQuiz = null;
 let toastTimer;
 let isGeneratingQuiz = false;
+let examTimerInterval = null;
+
+function stopExamTimer() {
+  if (examTimerInterval) {
+    clearInterval(examTimerInterval);
+    examTimerInterval = null;
+  }
+}
+
+function formatTimerClock(msRemaining) {
+  const totalSec = Math.max(0, Math.ceil(msRemaining / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
@@ -91,6 +106,12 @@ function bindGenerateButtons() {
       openGenerateQuizModal(subjectId, topicId);
     });
   });
+  $('#page-content').querySelectorAll('[data-open-exam]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const subjectId = btn.dataset.subject || '';
+      openExamModal(subjectId);
+    });
+  });
   $('#page-content').querySelectorAll('[data-clear-mistakes]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       if (!confirm('¿Seguro que quieres vaciar tu lista de preguntas falladas?')) return;
@@ -151,7 +172,7 @@ function subjectCard(subject) {
   const topicCount = subject.topics.length;
   const sectionCount = subject.topics.reduce((sum, topic) => sum + topic.sections.length, 0);
   const questionCount = subject.topics.reduce((sum, topic) => sum + topic.sections.reduce((sectionSum, section) => sectionSum + (section.questionCount || section.questions?.length || 0), 0), 0);
-  return `<article class="subject-card" data-color="${escapeHtml(subject.color || '')}"><div class="subject-card-top">${iconTile(ICONS.folder, subject.color)}<div><h3>${escapeHtml(subject.name)}</h3><p>${escapeHtml(subject.description)}</p></div></div><div class="subject-card-meta"><span>${topicCount} ${topicCount === 1 ? 'temario' : 'temarios'}</span><span>${sectionCount} tests</span><span>${questionCount} preguntas</span></div><div class="subject-card-actions"><a class="primary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Abrir asignatura ${ICONS.arrow}</a><a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Ver tests</a><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Test IA</button></div></article>`;
+  return `<article class="subject-card" data-color="${escapeHtml(subject.color || '')}"><div class="subject-card-top">${iconTile(ICONS.folder, subject.color)}<div><h3>${escapeHtml(subject.name)}</h3><p>${escapeHtml(subject.description)}</p></div></div><div class="subject-card-meta"><span>${topicCount} ${topicCount === 1 ? 'temario' : 'temarios'}</span><span>${sectionCount} tests</span><span>${questionCount} preguntas</span></div><div class="subject-card-actions"><a class="primary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Abrir asignatura ${ICONS.arrow}</a><button class="secondary-button" type="button" data-open-exam data-subject="${escapeHtml(subject.id)}">${ICONS.clock} Simulacro</button><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Test IA</button></div></article>`;
 }
 
 async function renderHome() {
@@ -175,27 +196,30 @@ function topicAccordion(subject, topic, index, scores = dataService.readScores()
 }
 
 async function renderSubjects() {
+  stopExamTimer();
   activeQuiz = null;
   setNavigation('subjects');
   renderLoading('Cargando asignaturas...');
   const catalog = await dataService.getCatalog();
   const scores = dataService.readScores();
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TODO TU MATERIAL, EN SU SITIO</p><h1>Asignaturas</h1><p>Despliega una asignatura para ver sus temarios, abrir el PDF o generar nuevos tests con IA.</p></div><button class="primary-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button></section><div class="subject-list-accordion">${catalog.map((subject) => `<details class="subject-accordion" open><summary><span class="summary-left">${iconTile(ICONS.folder, subject.color)}<span class="summary-title"><strong>${escapeHtml(subject.name)}</strong><span>${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index, scores)).join('')}</div></details>`).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TODO TU MATERIAL, EN SU SITIO</p><h1>Asignaturas</h1><p>Despliega una asignatura para ver sus temarios, abrir el PDF o generar nuevos tests con IA.</p></div><div class="test-actions"><button class="secondary-button" type="button" data-open-exam>${ICONS.clock} Simulacro de examen</button><button class="primary-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button></div></section><div class="subject-list-accordion">${catalog.map((subject) => `<details class="subject-accordion" open><summary><span class="summary-left">${iconTile(ICONS.folder, subject.color)}<span class="summary-title"><strong>${escapeHtml(subject.name)}</strong><span>${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index, scores)).join('')}</div></details>`).join('')}</div>`;
   bindGenerateButtons();
 }
 
 async function renderSubject(subjectId) {
+  stopExamTimer();
   activeQuiz = null;
   renderLoading('Cargando asignatura...');
   const subject = await dataService.getSubject(subjectId);
   if (!subject) return renderSubjects();
   const scores = dataService.readScores();
   setNavigation('subjects', subject.name);
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">ASIGNATURA</p><h1>${escapeHtml(subject.name)}</h1><p>${escapeHtml(subject.description)}</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Generar test con IA</button></section><div class="subject-list-accordion">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index, scores)).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">ASIGNATURA</p><h1>${escapeHtml(subject.name)}</h1><p>${escapeHtml(subject.description)}</p></div><div class="test-actions"><button class="secondary-button" type="button" data-open-exam data-subject="${escapeHtml(subject.id)}">${ICONS.clock} Simulacro de examen</button><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Generar test con IA</button></div></section><div class="subject-list-accordion">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index, scores)).join('')}</div>`;
   bindGenerateButtons();
 }
 
 async function renderTests(subjectId) {
+  stopExamTimer();
   activeQuiz = null;
   setNavigation('tests');
   renderLoading('Cargando cuestionarios...');
@@ -204,7 +228,7 @@ async function renderTests(subjectId) {
   const selectedSubject = subjectId ? catalog.find((s) => s.id === subjectId) : null;
   const mistakes = await dataService.getMistakes().catch(() => []);
   const groups = catalog.filter((subject) => !selectedSubject || subject.id === selectedSubject.id).flatMap((subject) => subject.topics.flatMap((topic) => topic.sections.map((section) => ({ subject, topic, section }))));
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">PRACTICA CON PREGUNTAS DEL TEMARIO</p><h1>Tests</h1><p>Cuestionarios redactados a partir de tus apuntes o generados a medida con Gemini AI y sincronizados en Supabase.</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.sparkle} Generar nuevo test con IA</button></section>${reviewBanner(mistakes, selectedSubject?.id || '')}<div class="page-heading-actions"><label class="subject-filter"><span>Asignatura</span><select id="test-subject-filter"><option value="">Todas las asignaturas</option>${catalog.map((subject) => `<option value="${escapeHtml(subject.id)}" ${selectedSubject?.id === subject.id ? 'selected' : ''}>${escapeHtml(subject.name)}</option>`).join('')}</select></label></div><div class="test-groups">${groups.map(({ subject, topic, section }, index) => `<section class="panel test-group"><div class="test-group-head"><div><h2>${escapeHtml(section.name)}</h2><p>${escapeHtml(subject.name)} · ${escapeHtml(topic.name)} · ${escapeHtml(section.description)}</p></div><div class="test-head-meta">${sectionScoreBadge(subject.name, section.name, scores)}<span class="test-count">${section.questionCount || section.questions?.length || 0} preguntas</span></div></div><div class="test-list"><div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>Test: ${escapeHtml(section.name)}</strong><span>Selección múltiple · respuesta y explicación al momento</span></div><div class="test-actions">${deleteAiTestButton(subject.id, topic.id, section)}<a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div></div></section>`).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">PRACTICA CON PREGUNTAS DEL TEMARIO</p><h1>Tests</h1><p>Cuestionarios redactados a partir de tus apuntes, generados con Gemini AI o simulacros de examen personalizados.</p></div><div class="test-actions"><button class="secondary-button" type="button" data-open-exam data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.clock} Simulacro de examen</button><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.sparkle} Generar nuevo test con IA</button></div></section>${reviewBanner(mistakes, selectedSubject?.id || '')}<div class="page-heading-actions"><label class="subject-filter"><span>Asignatura</span><select id="test-subject-filter"><option value="">Todas las asignaturas</option>${catalog.map((subject) => `<option value="${escapeHtml(subject.id)}" ${selectedSubject?.id === subject.id ? 'selected' : ''}>${escapeHtml(subject.name)}</option>`).join('')}</select></label></div><div class="test-groups">${groups.map(({ subject, topic, section }, index) => `<section class="panel test-group"><div class="test-group-head"><div><h2>${escapeHtml(section.name)}</h2><p>${escapeHtml(subject.name)} · ${escapeHtml(topic.name)} · ${escapeHtml(section.description)}</p></div><div class="test-head-meta">${sectionScoreBadge(subject.name, section.name, scores)}<span class="test-count">${section.questionCount || section.questions?.length || 0} preguntas</span></div></div><div class="test-list"><div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>Test: ${escapeHtml(section.name)}</strong><span>Selección múltiple · respuesta y explicación al momento</span></div><div class="test-actions">${deleteAiTestButton(subject.id, topic.id, section)}<a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div></div></section>`).join('')}</div>`;
   $('#test-subject-filter')?.addEventListener('change', (event) => {
     const next = event.target.value;
     location.hash = next ? `#tests/${encodeURIComponent(next)}` : '#tests';
@@ -256,51 +280,113 @@ async function startQuiz(subjectId, topicId, sectionId) {
 function renderQuiz() {
   if (!activeQuiz) return renderTests();
   if (activeQuiz.complete) return renderQuizResult();
-  const { subject, topic, section, order, index } = activeQuiz;
+  const { subject, topic, section, order, index, mode } = activeQuiz;
+  const isExam = mode === 'exam';
   const question = section.questions[order[index]];
   const answered = activeQuiz.selected !== null;
-  const correct = answered && activeQuiz.selected === question.answer;
+  const isBlank = activeQuiz.selected === 'blank';
+  const correct = answered && !isBlank && activeQuiz.selected === question.answer;
   setNavigation('tests', section.name);
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">${escapeHtml(activeQuiz.mode === 'review' ? (question.origin || 'Repaso de fallos') : `${subject.name} · ${topic.name}`)}</p><h1>${escapeHtml(section.name)}<span>.</span></h1><p>Elige una respuesta. Después verás la explicación de tus apuntes.</p></div><a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Salir del test</a></section><section class="panel quiz-panel"><div class="quiz-meta"><span>Pregunta ${index + 1} de ${order.length}</span><span>${activeQuiz.score} ${activeQuiz.score === 1 ? 'acierto' : 'aciertos'}</span></div><div class="quiz-progress"><span style="width:${Math.round(index / order.length * 100)}%"></span></div><h2 class="quiz-question">${escapeHtml(question.question)}</h2><div class="quiz-options">${question.options.map((option, optionIndex) => {
+
+  const eyebrowText =
+    mode === 'review'
+      ? question.origin || 'Repaso de fallos'
+      : isExam
+      ? question.origin || `${subject.name} · ${topic.name}`
+      : `${subject.name} · ${topic.name}`;
+
+  let examMetaPills = '';
+  if (isExam) {
+    const pen = Number(activeQuiz.penaltyPerWrong) || 0;
+    const penText = pen > 0 ? `Fallo: -${pen.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')} aciertos` : 'Sin penalización';
+    let timerPill = '';
+    if (activeQuiz.endsAt) {
+      const rem = Math.max(0, activeQuiz.endsAt - Date.now());
+      const urgent = rem < 60000 ? ' is-low' : ' is-mid';
+      timerPill = `<span class="score-badge${urgent}" id="quiz-timer-badge">${ICONS.clock} ${formatTimerClock(rem)}</span>`;
+    }
+    examMetaPills = `<div class="exam-quiz-pills"><span class="score-badge is-pending">${escapeHtml(penText)}</span>${timerPill}</div>`;
+  }
+
+  const rightScoreInfo = isExam
+    ? `${activeQuiz.score} ✓ · ${activeQuiz.wrongCount || 0} ✕ · ${activeQuiz.blankCount || 0} en blanco`
+    : `${activeQuiz.score} ${activeQuiz.score === 1 ? 'acierto' : 'aciertos'}`;
+
+  let feedbackHtml = '';
+  if (answered) {
+    if (isBlank) {
+      feedbackHtml = `<div class="quiz-feedback is-blank"><strong>Pregunta dejada en blanco (no suma ni resta)</strong><span>${escapeHtml(question.explanation)}</span></div>`;
+    } else {
+      feedbackHtml = `<div class="quiz-feedback ${correct ? 'is-correct' : 'is-incorrect'}"><strong>${correct ? 'Correcto' : 'Repasa esta respuesta'}</strong><span>${escapeHtml(question.explanation)}</span></div>`;
+    }
+  }
+
+  const footerActions = answered
+    ? `<button class="primary-button" id="next-question">${index + 1 === order.length ? (isExam ? 'Finalizar examen' : 'Ver resultado') : 'Siguiente pregunta'} ${ICONS.arrow}</button>`
+    : isExam
+    ? `<button class="secondary-button" type="button" id="skip-question">Dejar en blanco</button>`
+    : '';
+
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">${escapeHtml(eyebrowText)}</p><h1>${escapeHtml(section.name)}<span>.</span></h1><p>${isExam ? 'Simulacro de examen: puedes responder o dejar la pregunta en blanco si dudas.' : 'Elige una respuesta. Después verás la explicación de tus apuntes.'}</p></div><div class="test-actions">${examMetaPills}<a class="secondary-button" href="#tests/${encodeURIComponent(subject.id)}">Salir del test</a></div></section><section class="panel quiz-panel"><div class="quiz-meta"><span>Pregunta ${index + 1} de ${order.length}</span><span>${escapeHtml(rightScoreInfo)}</span></div><div class="quiz-progress"><span style="width:${Math.round(index / order.length * 100)}%"></span></div><h2 class="quiz-question">${escapeHtml(question.question)}</h2><div class="quiz-options">${question.options.map((option, optionIndex) => {
     let state = '';
     if (answered) state = optionIndex === question.answer ? ' correct' : optionIndex === activeQuiz.selected ? ' incorrect' : ' muted';
     return `<button class="quiz-option${state}" data-option="${optionIndex}" ${answered ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + optionIndex)}</span><span>${escapeHtml(option)}</span>${answered && optionIndex === question.answer ? `<span class="option-check">${ICONS.check}</span>` : ''}</button>`;
-  }).join('')}</div>${answered ? `<div class="quiz-feedback ${correct ? 'is-correct' : 'is-incorrect'}"><strong>${correct ? 'Correcto' : 'Repasa esta respuesta'}</strong><span>${escapeHtml(question.explanation)}</span></div>` : ''}<div class="quiz-footer"><span class="quiz-hint">${answered ? 'Cuando quieras, sigue con la siguiente.' : 'Selecciona una respuesta para continuar.'}</span>${answered ? `<button class="primary-button" id="next-question">${index + 1 === order.length ? 'Ver resultado' : 'Siguiente pregunta'} ${ICONS.arrow}</button>` : ''}</div></section>`;
+  }).join('')}</div>${feedbackHtml}<div class="quiz-footer"><span class="quiz-hint">${answered ? 'Cuando quieras, sigue con la siguiente.' : isExam ? 'Selecciona una opción o déjala en blanco para no penalizar.' : 'Selecciona una respuesta para continuar.'}</span><div class="test-actions">${footerActions}</div></div></section>`;
   
   $('#page-content').querySelectorAll('[data-option]').forEach((button) => button.addEventListener('click', () => {
     const selected = Number(button.dataset.option);
     activeQuiz.selected = selected;
     if (selected === question.answer) {
       activeQuiz.score += 1;
-      // En modo repaso, acertar una pregunta la saca de la lista de fallos
       if (activeQuiz.mode === 'review') {
         dataService.resolveMistake(question.id).catch((err) => console.warn('No se pudo quitar el fallo de la lista:', err));
       }
     } else {
+      activeQuiz.wrongCount = (activeQuiz.wrongCount || 0) + 1;
       activeQuiz.missed.push(question);
       dataService.recordMistake(question).catch((err) => console.warn('No se pudo guardar el fallo:', err));
     }
     renderQuiz();
   }));
 
+  $('#skip-question')?.addEventListener('click', () => {
+    activeQuiz.selected = 'blank';
+    activeQuiz.blankCount = (activeQuiz.blankCount || 0) + 1;
+    renderQuiz();
+  });
+
   $('#next-question')?.addEventListener('click', () => {
     activeQuiz.index += 1;
     activeQuiz.selected = null;
-    if (activeQuiz.index >= activeQuiz.order.length) activeQuiz.complete = true;
+    if (activeQuiz.index >= activeQuiz.order.length) {
+      activeQuiz.complete = true;
+      activeQuiz.finishedAt = Date.now();
+      stopExamTimer();
+    }
     renderQuiz();
   });
 }
 
 async function renderQuizResult() {
+  stopExamTimer();
   const { subject, topic, section, score, order, mode, missed = [], reviewSubjectId = '' } = activeQuiz;
   const isReview = mode === 'review';
-  const percentage = Math.round(score / order.length * 100);
+  const isExam = mode === 'exam';
+  const total = order.length;
+  const wrongCount = activeQuiz.wrongCount || 0;
+  const blankCount = activeQuiz.blankCount || 0;
+  const penaltyPerWrong = Number(activeQuiz.penaltyPerWrong) || 0;
+  const penaltySubtracted = isExam ? wrongCount * penaltyPerWrong : 0;
+  const netScore = isExam ? Math.max(0, score - penaltySubtracted) : score;
+  const grade10 = (netScore / total) * 10;
+  const percentage = Math.round((netScore / total) * 100);
+
   if (!isReview) {
     await dataService.saveScore({
       subject: subject.name,
       section: section.name,
-      score,
-      total: order.length,
+      score: Math.round(netScore * 100) / 100,
+      total,
       percentage,
       date: new Date().toISOString()
     });
@@ -311,6 +397,9 @@ async function renderQuizResult() {
 
   const message = isReview
     ? (missedCount ? `Has resuelto ${score} de tus fallos. Te ${missedCount === 1 ? 'queda 1' : `quedan ${missedCount}`} por dominar.` : 'Has resuelto todas las preguntas del repaso. ¡Fuera de tu lista!')
+    : isExam
+    ? (activeQuiz.timedOut ? '⏰ Se agotó el tiempo del examen. ' : '') +
+      (grade10 >= 9 ? '¡Sobresaliente! Dominas la asignatura con solvencia.' : grade10 >= 7 ? '¡Notable! Muy buen resultado en el simulacro.' : grade10 >= 5 ? 'Examen aprobado. Repasa los fallos para subir nota.' : 'No has alcanzado el 5,00. Repasa las preguntas falladas e inténtalo de nuevo.')
     : (percentage >= 80 ? 'Muy buen dominio de este bloque.' : percentage >= 60 ? 'Buen repaso. Refuerza las preguntas que te han costado.' : 'Puedes volver al temario y repetir el test cuando quieras.');
 
   let note = '';
@@ -320,14 +409,38 @@ async function renderQuizResult() {
     note = '<p class="result-note">Tus fallos se han guardado en tu lista de repaso.</p>';
   }
 
+  let examBreakdownHtml = '';
+  if (isExam) {
+    const elapsedMs = Math.max(1000, (activeQuiz.finishedAt || Date.now()) - (activeQuiz.startedAt || Date.now()));
+    const penSubStr = penaltyPerWrong > 0 ? ` (-${penaltySubtracted.toFixed(2).replace('.', ',')} pts)` : '';
+    examBreakdownHtml = `
+      <div class="exam-result-breakdown">
+        <article><strong>${score}</strong><span>Aciertos</span></article>
+        <article><strong>${wrongCount}${escapeHtml(penSubStr)}</strong><span>Fallos</span></article>
+        <article><strong>${blankCount}</strong><span>En blanco</span></article>
+        <article><strong>${formatTimerClock(elapsedMs)}</strong><span>Tiempo</span></article>
+      </div>
+    `;
+  }
+
   const missedButton = missedCount
     ? `<button class="primary-button" type="button" id="review-missed">${ICONS.target} Repasar ${missedCount === 1 ? 'la que he fallado' : `las ${missedCount} que he fallado`}</button>`
     : '';
   const otherButtons = isReview
     ? `<a class="secondary-button" href="#tests">Volver a tests</a>`
+    : isExam
+    ? `<button class="${missedCount ? 'secondary-button' : 'primary-button'}" type="button" id="retry-exam">Repetir simulacro ${ICONS.arrow}</button><button class="secondary-button" type="button" id="config-new-exam">${ICONS.clock} Configurar otro examen</button><a class="secondary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Ir a la asignatura</a>`
     : `<button class="${missedCount ? 'secondary-button' : 'primary-button'}" type="button" id="retry-quiz">Repetir test ${ICONS.arrow}</button><button class="secondary-button ai-accent-button" type="button" id="gen-another-quiz">${ICONS.sparkle} Generar otro test IA</button><a class="secondary-button" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">Volver al temario</a>`;
 
-  $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${isReview ? ICONS.target : ICONS.check}</span><p class="eyebrow">${isReview ? 'REPASO COMPLETADO' : `TEST COMPLETADO · ${escapeHtml(section.name)}`}</p><h2>${score} de ${order.length} correctas</h2><p>${message}</p><div class="result-score">${percentage}%</div>${note}<div class="result-buttons">${missedButton}${otherButtons}</div></section>`;
+  const mainScoreDisplay = isExam
+    ? `${grade10.toFixed(2).replace('.', ',')} <span class="exam-grade-of">/ 10</span>`
+    : `${percentage}%`;
+
+  const headlineText = isExam
+    ? `${grade10 >= 5 ? 'APROBADO' : 'NO SUPERADO'} · ${percentage}% neto`
+    : `${score} de ${total} correctas`;
+
+  $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${isReview ? ICONS.target : isExam ? ICONS.clock : ICONS.check}</span><p class="eyebrow">${isReview ? 'REPASO COMPLETADO' : isExam ? `SIMULACRO FINALIZADO · ${escapeHtml(subject.name)}` : `TEST COMPLETADO · ${escapeHtml(section.name)}`}</p><h2>${escapeHtml(headlineText)}</h2><p>${escapeHtml(message)}</p><div class="result-score">${mainScoreDisplay}</div>${examBreakdownHtml}${note}<div class="result-buttons">${missedButton}${otherButtons}</div></section>`;
 
   $('#review-missed')?.addEventListener('click', () => {
     const questions = missed.map((q) => ({ ...q, origin: q.origin || `${subject.name} · ${section.name}` }));
@@ -335,6 +448,14 @@ async function renderQuizResult() {
   });
   $('#retry-quiz')?.addEventListener('click', () => startQuiz(subject.id, topic.id, section.id));
   $('#gen-another-quiz')?.addEventListener('click', () => openGenerateQuizModal(subject.id, topic.id));
+  $('#retry-exam')?.addEventListener('click', () => {
+    if (activeQuiz?.examConfig) {
+      startExamSimulation(activeQuiz.examConfig);
+    } else {
+      openExamModal(subject.id);
+    }
+  });
+  $('#config-new-exam')?.addEventListener('click', () => openExamModal(subject.id));
 }
 
 /* ============================================================================
@@ -963,7 +1084,7 @@ async function populateGeneratorSelectors(selectedSubjectId = '', selectedTopicI
 
 function syncPresetPills(countValue) {
   const num = Number(countValue);
-  document.querySelectorAll('.preset-pill').forEach((pill) => {
+  document.querySelectorAll('#generate-quiz-modal [data-count]').forEach((pill) => {
     pill.classList.toggle('active', Number(pill.dataset.count) === num);
   });
 }
@@ -995,7 +1116,7 @@ function closeGenerateQuizModal() {
   $('#generate-quiz-modal').hidden = true;
 }
 
-document.querySelectorAll('.preset-pill').forEach((pill) => {
+document.querySelectorAll('#generate-quiz-modal [data-count]').forEach((pill) => {
   pill.addEventListener('click', () => {
     const count = Number(pill.dataset.count) || 10;
     $('#gen-question-count').value = count;
@@ -1094,7 +1215,297 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     if (!$('#profile-modal').hidden) closeProfile();
     if (!$('#generate-quiz-modal').hidden) closeGenerateQuizModal();
+    if (!$('#exam-modal').hidden) closeExamModal();
   }
+});
+
+/* ============================================================================
+ * MODAL Y LÓGICA DE SIMULACRO DE EXAMEN PERSONALIZADO
+ * ============================================================================ */
+
+let examAvailableCount = 0;
+
+function updateExamAvailableQuestions(subject) {
+  const checkedBoxes = Array.from(document.querySelectorAll('#exam-topics-list input[type="checkbox"]:checked'));
+  const selectedTopicIds = new Set(checkedBoxes.map((cb) => cb.value));
+  const topics = (subject?.topics || []).filter((t) => selectedTopicIds.has(t.id));
+  examAvailableCount = topics.reduce(
+    (sum, t) => sum + t.sections.reduce((sSum, s) => sSum + (s.questionCount || s.questions?.length || 0), 0),
+    0
+  );
+  $('#exam-available-note').textContent = `${examAvailableCount} ${examAvailableCount === 1 ? 'pregunta disponible' : 'preguntas disponibles'} en los ${topics.length} ${topics.length === 1 ? 'tema seleccionado' : 'temas seleccionados'}`;
+  $('#submit-exam-modal').disabled = examAvailableCount === 0;
+}
+
+function syncExamPresetPills(val) {
+  document.querySelectorAll('#exam-count-presets [data-exam-count]').forEach((pill) => {
+    const pVal = pill.dataset.examCount;
+    if (pVal === 'all') {
+      pill.classList.toggle('active', examAvailableCount > 0 && Number(val) === examAvailableCount);
+    } else {
+      pill.classList.toggle('active', Number(pVal) === Number(val));
+    }
+  });
+}
+
+async function openExamModal(preferredSubjectId = '') {
+  const modal = $('#exam-modal');
+  const catalog = await dataService.getCatalog();
+  const subjectSelect = $('#exam-subject-select');
+  const topicsList = $('#exam-topics-list');
+
+  subjectSelect.innerHTML = catalog
+    .map((sub) => `<option value="${escapeHtml(sub.id)}">${escapeHtml(sub.name)}</option>`)
+    .join('');
+
+  const initialSub = catalog.find((s) => s.id === preferredSubjectId) || catalog[0];
+  if (initialSub) {
+    subjectSelect.value = initialSub.id;
+  }
+
+  function renderTopicCheckboxes(subId) {
+    const sub = catalog.find((s) => s.id === subId) || catalog[0];
+    const topics = sub?.topics || [];
+    if (!topics.length) {
+      topicsList.innerHTML = '<p class="exam-available-note">Esta asignatura no tiene temarios todavía.</p>';
+      updateExamAvailableQuestions(sub);
+      return;
+    }
+    topicsList.innerHTML = topics
+      .map((top) => {
+        const qCount = top.sections.reduce((sSum, s) => sSum + (s.questionCount || s.questions?.length || 0), 0);
+        return `<label class="exam-topic-item">
+          <input type="checkbox" value="${escapeHtml(top.id)}" checked />
+          <span class="exam-topic-name">${escapeHtml(top.name)}</span>
+          <span class="test-count">${qCount} preg.</span>
+        </label>`;
+      })
+      .join('');
+
+    topicsList.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.addEventListener('change', () => updateExamAvailableQuestions(sub));
+    });
+
+    updateExamAvailableQuestions(sub);
+    const currentWanted = Number($('#exam-question-count').value) || 20;
+    if (examAvailableCount > 0 && currentWanted > examAvailableCount) {
+      $('#exam-question-count').value = examAvailableCount;
+    }
+    syncExamPresetPills($('#exam-question-count').value);
+  }
+
+  renderTopicCheckboxes(subjectSelect.value);
+
+  subjectSelect.onchange = () => {
+    renderTopicCheckboxes(subjectSelect.value);
+  };
+
+  $('#exam-select-all-topics').onclick = () => {
+    const sub = catalog.find((s) => s.id === subjectSelect.value) || catalog[0];
+    topicsList.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.checked = true;
+    });
+    updateExamAvailableQuestions(sub);
+  };
+
+  $('#exam-deselect-all-topics').onclick = () => {
+    const sub = catalog.find((s) => s.id === subjectSelect.value) || catalog[0];
+    topicsList.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.checked = false;
+    });
+    updateExamAvailableQuestions(sub);
+  };
+
+  modal.hidden = false;
+}
+
+function closeExamModal() {
+  $('#exam-modal').hidden = true;
+}
+
+$('#close-exam-modal').addEventListener('click', closeExamModal);
+$('#cancel-exam-modal').addEventListener('click', closeExamModal);
+$('#exam-modal').addEventListener('click', (event) => {
+  if (event.target.id === 'exam-modal') closeExamModal();
+});
+
+document.querySelectorAll('#exam-count-presets [data-exam-count]').forEach((pill) => {
+  pill.addEventListener('click', () => {
+    const raw = pill.dataset.examCount;
+    const count = raw === 'all' ? Math.max(1, examAvailableCount) : Number(raw) || 20;
+    $('#exam-question-count').value = count;
+    syncExamPresetPills(count);
+  });
+});
+
+$('#exam-question-count').addEventListener('input', (event) => {
+  syncExamPresetPills(event.target.value);
+});
+
+$('#exam-penalty-select').addEventListener('change', (event) => {
+  const isCustom = event.target.value === 'custom';
+  $('#exam-custom-penalty-field').hidden = !isCustom;
+  if (isCustom) {
+    $('#exam-penalty-custom').focus();
+  }
+});
+
+async function startExamSimulation({
+  subjectId,
+  topicIds = [],
+  questionCount = 20,
+  penaltyPerWrong = 0.3333333,
+  timerMinutes = 20
+}) {
+  stopExamTimer();
+  renderLoading('Preparando simulacro de examen y mezclando preguntas...');
+
+  try {
+    const subject = await dataService.getSubject(subjectId);
+    if (!subject) {
+      showToast('No se encontró la asignatura seleccionada.');
+      return renderTests();
+    }
+
+    const selectedTopics = subject.topics.filter((t) => topicIds.includes(t.id));
+    if (!selectedTopics.length) {
+      showToast('Selecciona al menos un temario para el examen.');
+      return renderSubject(subjectId);
+    }
+
+    const detailsList = await Promise.all(
+      selectedTopics.map((t) => dataService.getTopicDetails(subjectId, t.id))
+    );
+
+    const byQuestionText = new Map();
+    detailsList.forEach((details, idx) => {
+      const top = selectedTopics[idx];
+      for (const sec of details?.sections || []) {
+        for (const q of sec.questions || []) {
+          const key = String(q.question || '').trim().toLowerCase();
+          if (!key) continue;
+          byQuestionText.set(key, {
+            ...q,
+            origin: `${subject.name} · ${top.name} · ${sec.name}`
+          });
+        }
+      }
+    });
+
+    const pool = Array.from(byQuestionText.values());
+    if (!pool.length) {
+      showToast('No hay preguntas disponibles en los temarios seleccionados.');
+      return renderSubject(subjectId);
+    }
+
+    // Mezcla aleatoria Fisher-Yates
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    const finalQuestions = pool.slice(0, Math.max(1, Math.min(pool.length, Number(questionCount) || 20)));
+    const mins = Math.max(0, Number(timerMinutes) || 0);
+    const now = Date.now();
+
+    activeQuiz = {
+      mode: 'exam',
+      subject,
+      topic: {
+        id: 'simulacro',
+        name:
+          selectedTopics.length === subject.topics.length
+            ? 'Todos los temas'
+            : `${selectedTopics.length} ${selectedTopics.length === 1 ? 'tema' : 'temas'}`
+      },
+      section: {
+        id: 'simulacro',
+        name: `Simulacro · ${subject.name}`,
+        questions: finalQuestions
+      },
+      order: [...finalQuestions.keys()],
+      index: 0,
+      score: 0,
+      wrongCount: 0,
+      blankCount: 0,
+      penaltyPerWrong: Math.max(0, Number(penaltyPerWrong) || 0),
+      timerMinutes: mins,
+      startedAt: now,
+      endsAt: mins > 0 ? now + mins * 60 * 1000 : null,
+      timedOut: false,
+      examConfig: { subjectId, topicIds, questionCount, penaltyPerWrong, timerMinutes },
+      selected: null,
+      complete: false,
+      missed: []
+    };
+
+    if (activeQuiz.endsAt) {
+      examTimerInterval = setInterval(() => {
+        if (!activeQuiz || activeQuiz.mode !== 'exam' || activeQuiz.complete) {
+          stopExamTimer();
+          return;
+        }
+        const rem = activeQuiz.endsAt - Date.now();
+        if (rem <= 0) {
+          stopExamTimer();
+          const unanswered = Math.max(
+            0,
+            activeQuiz.order.length - (activeQuiz.score + (activeQuiz.wrongCount || 0) + (activeQuiz.blankCount || 0))
+          );
+          activeQuiz.blankCount = (activeQuiz.blankCount || 0) + unanswered;
+          activeQuiz.timedOut = true;
+          activeQuiz.complete = true;
+          activeQuiz.finishedAt = Date.now();
+          showToast('⏰ ¡Tiempo agotado! Se ha cerrado el examen automáticamente.', 5000);
+          renderQuizResult();
+          return;
+        }
+        const badge = $('#quiz-timer-badge');
+        if (badge) {
+          badge.innerHTML = `${ICONS.clock} ${formatTimerClock(rem)}`;
+          if (rem < 60000) {
+            badge.classList.remove('is-mid');
+            badge.classList.add('is-low');
+          }
+        }
+      }, 1000);
+    }
+
+    renderQuiz();
+  } catch (err) {
+    console.error('Error al iniciar el simulacro de examen:', err);
+    showToast(err.message || 'No se pudo iniciar el simulacro de examen.', 5000);
+  }
+}
+
+$('#exam-config-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const subjectId = $('#exam-subject-select').value;
+  const topicIds = Array.from(
+    document.querySelectorAll('#exam-topics-list input[type="checkbox"]:checked')
+  ).map((cb) => cb.value);
+
+  if (!topicIds.length) {
+    showToast('Marca al menos un temario para el examen.');
+    return;
+  }
+
+  const questionCount = Math.max(1, Number($('#exam-question-count').value) || 20);
+  const penSelect = $('#exam-penalty-select').value;
+  const penaltyPerWrong =
+    penSelect === 'custom'
+      ? Math.max(0, Number($('#exam-penalty-custom').value) || 0)
+      : Math.max(0, Number(penSelect) || 0);
+  const timerMinutes = Math.max(0, Number($('#exam-timer-select').value) || 0);
+
+  closeExamModal();
+  await startExamSimulation({
+    subjectId,
+    topicIds,
+    questionCount,
+    penaltyPerWrong,
+    timerMinutes
+  });
 });
 
 $('#login-form').addEventListener('submit', async (event) => {
