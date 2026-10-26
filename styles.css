@@ -161,7 +161,7 @@
 .exam-topic-name{flex:1;min-width:0;font-weight:500}
 .exam-available-note{font-size:10px;color:var(--muted)}
 .exam-quiz-pills{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-. exam-quiz-pills .score-badge svg,.score-badge svg{width:12px;height:12px;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.exam-quiz-pills .score-badge svg,.score-badge svg{width:12px;height:12px;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .quiz-feedback.is-blank{background:var(--panel-2)!important;border:1px solid var(--line);color:var(--ink)!important}
 .exam-grade-of{font-size:18px;font-weight:600;color:var(--muted)}
 .exam-result-breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 18px;text-align:center}
@@ -170,3 +170,30 @@
 .exam-result-breakdown strong{font:700 14px var(--display);color:var(--ink)}
 .exam-result-breakdown span{font-size:9px;color:var(--muted)}
 @media(max-width:560px){.exam-result-breakdown{grid-template-columns:repeat(2,1fr)}}
+
+/* Recent Activity & Profile History */
+.profile-modal{max-height:90vh;overflow-y:auto}
+.activity-row .test-index svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.panel-head button.text-link{border:0;background:transparent;padding:0;font:600 10px var(--sans)}
+.profile-history-box{margin:0 0 16px;padding:12px 13px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)}
+:root[data-theme="light"] .profile-history-box{background:#f8f9fb}
+.profile-history-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.profile-history-head .account-title{margin:0}
+.profile-history-subhead{margin-top:14px;padding-top:11px;border-top:1px solid var(--line)}
+.danger-link{color:var(--red)!important;font-size:9px!important}
+.subject-progress-list{display:grid;gap:8px}
+.subject-progress-item{display:grid;gap:4px}
+.subject-progress-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px}
+.subject-progress-top strong{font:600 10px var(--display);color:var(--ink)}
+.subject-progress-top span{font-size:9px;color:var(--muted)}
+.subject-progress-bar{height:5px;border-radius:999px;background:var(--bg);overflow:hidden;border:1px solid var(--line)}
+.subject-progress-bar span{display:block;height:100%;background:var(--accent-2);border-radius:999px}
+:root[data-theme="light"] .subject-progress-bar{background:#e5e7eb}
+.profile-attempts-list{display:grid;max-height:175px;overflow-y:auto;padding-right:2px}
+.profile-attempt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line)}
+.profile-attempt-row:last-child{border-bottom:0}
+.profile-attempt-copy{min-width:0;flex:1}
+.profile-attempt-copy strong{display:block;font:600 10px var(--display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-attempt-copy span{display:block;font-size:9px;color:var(--muted);margin-top:1px}
+.profile-attempt-right{display:flex;align-items:center;gap:6px;flex:none}
+.profile-attempt-fraction{font-size:9px;color:var(--muted);font-weight:600}

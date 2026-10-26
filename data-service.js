@@ -1532,6 +1532,24 @@ export const dataService = {
     }
   },
 
+  async clearScores() {
+    try {
+      localStorage.removeItem(SCORE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+    if (this.isLoggedIn() && this.isAuthAvailable()) {
+      const userId = session.user.id;
+      await supabaseFetch('quiz_scores', `user_id=eq.${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      });
+      remoteScores = [];
+    } else {
+      remoteScores = null;
+    }
+  },
+
   /**
    * Perfil de estudiante
    */

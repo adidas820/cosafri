@@ -112,6 +112,9 @@ function bindGenerateButtons() {
       openExamModal(subjectId);
     });
   });
+  $('#page-content').querySelectorAll('[data-open-profile]').forEach((btn) => {
+    btn.addEventListener('click', openProfile);
+  });
   $('#page-content').querySelectorAll('[data-clear-mistakes]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       if (!confirm('¿Seguro que quieres vaciar tu lista de preguntas falladas?')) return;
@@ -175,7 +178,53 @@ function subjectCard(subject) {
   return `<article class="subject-card" data-color="${escapeHtml(subject.color || '')}"><div class="subject-card-top">${iconTile(ICONS.folder, subject.color)}<div><h3>${escapeHtml(subject.name)}</h3><p>${escapeHtml(subject.description)}</p></div></div><div class="subject-card-meta"><span>${topicCount} ${topicCount === 1 ? 'temario' : 'temarios'}</span><span>${sectionCount} tests</span><span>${questionCount} preguntas</span></div><div class="subject-card-actions"><a class="primary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Abrir asignatura ${ICONS.arrow}</a><button class="secondary-button" type="button" data-open-exam data-subject="${escapeHtml(subject.id)}">${ICONS.clock} Simulacro</button><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Test IA</button></div></article>`;
 }
 
+function formatAttemptDateTime(iso) {
+  if (!iso) return 'Reciente';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Reciente';
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(d);
+}
+
+function recentActivityPanel(scores = []) {
+  const recent = scores.slice(0, 6);
+  if (!recent.length) {
+    return `<section class="panel section-panel"><div class="panel-head"><h2>Actividad reciente</h2><button class="text-link" type="button" data-open-profile>Ver perfil ${ICONS.arrow}</button></div><div class="admin-empty-state"><p>Todavía no has completado ningún test. Empieza uno o lanza un simulacro de examen para ver aquí tu evolución.</p></div></section>`;
+  }
+  return `<section class="panel section-panel">
+    <div class="panel-head">
+      <h2>Actividad reciente</h2>
+      <button class="text-link" type="button" data-open-profile>Ver historial completo (${scores.length}) ${ICONS.arrow}</button>
+    </div>
+    <div class="test-list activity-list">
+      ${recent
+        .map((item) => {
+          const pct = Number(item.percentage) || 0;
+          const tier = pct >= 80 ? 'is-high' : pct >= 60 ? 'is-mid' : 'is-low';
+          const isSim = String(item.section || '').toLowerCase().startsWith('simulacro');
+          return `<div class="test-row activity-row">
+            <span class="test-index">${isSim ? ICONS.clock : ICONS.check}</span>
+            <div class="test-row-copy">
+              <strong>${escapeHtml(item.section || 'Test')}</strong>
+              <span>${escapeHtml(item.subject || 'Asignatura')} · ${escapeHtml(formatAttemptDateTime(item.date))}</span>
+            </div>
+            <div class="test-actions">
+              <span class="test-count">${escapeHtml(String(item.score ?? 0))}/${escapeHtml(String(item.total ?? 0))}</span>
+              <span class="score-badge ${tier}">${pct}%</span>
+            </div>
+          </div>`;
+        })
+        .join('')}
+    </div>
+  </section>`;
+}
+
 async function renderHome() {
+  stopExamTimer();
   activeQuiz = null;
   setNavigation('home');
   renderLoading('Cargando tu biblioteca de estudio...');
@@ -183,9 +232,10 @@ async function renderHome() {
   const scores = dataService.readScores();
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score.percentage, 0) / scores.length) : 0;
   const mistakes = await dataService.getMistakes().catch(() => []);
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TU BIBLIOTECA DE ESTUDIO</p><h1>Buenas, estudiante<span>.</span></h1><p>Tus asignaturas, temarios y tests están organizados en un mismo sitio.</p></div><div class="test-actions"><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button><a class="primary-button" href="#asignaturas">Ir a mis asignaturas ${ICONS.arrow}</a></div></section>
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TU BIBLIOTECA DE ESTUDIO</p><h1>Buenas, estudiante<span>.</span></h1><p>Tus asignaturas, temarios y tests están organizados en un mismo sitio.</p></div><div class="test-actions"><button class="secondary-button" type="button" data-open-exam>${ICONS.clock} Simulacro de examen</button><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button><a class="primary-button" href="#asignaturas">Ir a mis asignaturas ${ICONS.arrow}</a></div></section>
     <section class="stats-grid"><article class="stat-card"><span class="stat-icon purple">${ICONS.folder}</span><div><span class="stat-label">Asignaturas</span><strong class="stat-number">${catalog.length}</strong><span class="stat-context">en tu biblioteca</span></div></article><article class="stat-card"><span class="stat-icon green">${ICONS.file}</span><div><span class="stat-label">Temarios</span><strong class="stat-number">${totalTopics(catalog)}</strong><span class="stat-context">listos para leer</span></div></article><article class="stat-card"><span class="stat-icon blue">${ICONS.check}</span><div><span class="stat-label">Media de tus tests</span><strong class="stat-number">${scores.length ? `${average}%` : '—'}</strong><span class="stat-context">${scores.length ? `${scores.length} tests completados` : 'empieza cuando quieras'}</span></div></article></section>
     ${reviewBanner(mistakes)}<section class="panel section-panel"><div class="panel-head"><h2>Mis asignaturas</h2><a class="text-link" href="#asignaturas">Ver biblioteca ${ICONS.arrow}</a></div><div class="subject-grid">${catalog.length ? catalog.map(subjectCard).join('') : '<div class="empty-card"><div><h3>La biblioteca está vacía</h3><p>Añade asignaturas y temarios al catálogo del repositorio.</p></div></div>'}</div></section>
+    ${recentActivityPanel(scores)}
     <section class="welcome-banner"><div class="banner-copy"><strong>¿Quieres practicar con preguntas nuevas sobre un tema?</strong><span>Genera un test a medida con Gemini AI eligiendo el número de preguntas y guárdalo en Supabase.</span></div><div class="test-actions"><button class="primary-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Crear test con Gemini</button><a class="secondary-button" href="#tests">Explorar tests ${ICONS.arrow}</a></div></section>`;
   bindGenerateButtons();
 }
@@ -1068,9 +1118,88 @@ function openProfile() {
   const scores = dataService.readScores();
   const attempts = scores.length;
   const questions = scores.reduce((sum, score) => sum + (Number(score.total) || 0), 0);
-  const correct = scores.reduce((sum, score) => sum + (Number(score.score) || 0), 0);
+  const correct = Math.round(scores.reduce((sum, score) => sum + (Number(score.score) || 0), 0) * 10) / 10;
   const average = attempts ? Math.round(scores.reduce((sum, score) => sum + (Number(score.percentage) || 0), 0) / attempts) : 0;
   $('#profile-stats').innerHTML = `<article><strong>${attempts}</strong><span>tests completados</span></article><article><strong>${attempts ? `${average}%` : '—'}</strong><span>media de aciertos</span></article><article><strong>${questions ? `${correct}/${questions}` : '—'}</strong><span>respuestas correctas</span></article>`;
+
+  const historyWrap = $('#profile-history-wrap');
+  if (historyWrap) {
+    if (!scores.length) {
+      historyWrap.innerHTML = '';
+    } else {
+      const bySubject = new Map();
+      for (const s of scores) {
+        const subName = s.subject || 'General';
+        const cur = bySubject.get(subName) || { count: 0, sum: 0 };
+        cur.count += 1;
+        cur.sum += Number(s.percentage) || 0;
+        bySubject.set(subName, cur);
+      }
+
+      const subjectRowsHtml = Array.from(bySubject.entries())
+        .map(([subName, data]) => {
+          const avg = Math.round(data.sum / data.count);
+          return `<div class="subject-progress-item">
+            <div class="subject-progress-top">
+              <strong>${escapeHtml(subName)}</strong>
+              <span>${data.count} ${data.count === 1 ? 'test' : 'tests'} · <strong>${avg}%</strong></span>
+            </div>
+            <div class="subject-progress-bar"><span style="width:${Math.max(2, Math.min(100, avg))}%"></span></div>
+          </div>`;
+        })
+        .join('');
+
+      const attemptRowsHtml = scores
+        .slice(0, 30)
+        .map((item) => {
+          const pct = Number(item.percentage) || 0;
+          const tier = pct >= 80 ? 'is-high' : pct >= 60 ? 'is-mid' : 'is-low';
+          return `<div class="profile-attempt-row">
+            <div class="profile-attempt-copy">
+              <strong>${escapeHtml(item.section || 'Test')}</strong>
+              <span>${escapeHtml(item.subject || '')} · ${escapeHtml(formatAttemptDateTime(item.date))}</span>
+            </div>
+            <div class="profile-attempt-right">
+              <span class="profile-attempt-fraction">${escapeHtml(String(item.score ?? 0))}/${escapeHtml(String(item.total ?? 0))}</span>
+              <span class="score-badge ${tier}">${pct}%</span>
+            </div>
+          </div>`;
+        })
+        .join('');
+
+      historyWrap.innerHTML = `
+        <div class="profile-history-box">
+          <div class="profile-history-head">
+            <span class="account-title">Rendimiento por asignatura</span>
+          </div>
+          <div class="subject-progress-list">${subjectRowsHtml}</div>
+          <div class="profile-history-head profile-history-subhead">
+            <span class="account-title">Historial de intentos (${scores.length})</span>
+            <button type="button" class="back-link danger-link" id="clear-scores-btn">Vaciar historial</button>
+          </div>
+          <div class="profile-attempts-list">${attemptRowsHtml}</div>
+        </div>
+      `;
+
+      $('#clear-scores-btn')?.addEventListener('click', async () => {
+        if (!confirm('¿Seguro que quieres borrar todo tu historial de notas y estadísticas?')) return;
+        const btn = $('#clear-scores-btn');
+        btn.disabled = true;
+        btn.textContent = 'Borrando...';
+        try {
+          await dataService.clearScores();
+          showToast('Historial de notas vaciado.');
+          openProfile();
+          renderRoute();
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = 'Vaciar historial';
+          showToast(err.message || 'No se pudo borrar el historial.', 4500);
+        }
+      });
+    }
+  }
+
   renderAccountState();
   modal.hidden = false;
   $('#profile-name-input').focus();
