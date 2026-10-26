@@ -1028,6 +1028,34 @@ export const dataService = {
     return session?.user || null;
   },
 
+  /**
+   * Obtiene la lista de usuarios registrados desde el endpoint de administración.
+   */
+  async getAdminUsers() {
+    if (!this.isAdmin()) {
+      throw new Error('Acceso restringido al administrador.');
+    }
+    const token = await getValidAccessToken();
+    const resp = await fetch('/.netlify/functions/admin?action=users', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        'La función de servidor (/.netlify/functions/admin) solo está disponible en Netlify (o con netlify dev).'
+      );
+    }
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data?.error || `Error al obtener usuarios (${resp.status}).`);
+    }
+    return Array.isArray(data?.users) ? data.users : [];
+  },
+
   async initAuth() {
     if (!this.isAuthAvailable()) return { signedIn: false };
 

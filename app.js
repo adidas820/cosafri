@@ -12,7 +12,9 @@ const ICONS = {
   file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6m-6 4h6"/></svg>',
   clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14ZM10 11v6M14 11v6"/></svg>'
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14ZM10 11v6M14 11v6"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5.5v6c0 5.25 3.4 10.15 8 11.5 4.6-1.35 8-6.25 8-11.5v-6L12 2Z"/><path d="m9.5 12 2 2 3.5-3.5"/></svg>',
+  users: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
 };
 
 let activeQuiz = null;
@@ -60,13 +62,25 @@ function setNavigation(section, label) {
   $('#nav-home').classList.toggle('active', section === 'home');
   $('#nav-subjects').classList.toggle('active', section === 'subjects');
   $('#nav-tests').classList.toggle('active', section === 'tests');
-  $('#breadcrumb-current').textContent = label || (section === 'home' ? 'Inicio' : section === 'subjects' ? 'Asignaturas' : 'Tests');
+  $('#nav-admin')?.classList.toggle('active', section === 'admin');
+  const defaultLabel =
+    section === 'home'
+      ? 'Inicio'
+      : section === 'subjects'
+      ? 'Asignaturas'
+      : section === 'admin'
+      ? 'Panel Admin'
+      : 'Tests';
+  $('#breadcrumb-current').textContent = label || defaultLabel;
 }
 
 async function renderSidebar() {
   const catalog = await dataService.getCatalog();
   $('#subject-count').textContent = catalog.length;
   $('#subject-list').innerHTML = catalog.map((subject) => `<a class="subject-row" href="#asignatura/${encodeURIComponent(subject.id)}"><span class="subject-dot" data-color="${escapeHtml(subject.color || '')}"></span><span>${escapeHtml(subject.name)}</span></a>`).join('');
+  if ($('#nav-admin')) {
+    $('#nav-admin').hidden = !dataService.isAdmin();
+  }
 }
 
 function bindGenerateButtons() {
@@ -378,6 +392,146 @@ async function startReview(subjectId = '') {
   }
 }
 
+function formatShortDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(d);
+}
+
+async function renderAdmin() {
+  activeQuiz = null;
+  setNavigation('admin', 'Panel Admin');
+
+  if (!dataService.isAdmin()) {
+    $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${ICONS.shield}</span><p class="eyebrow">ZONA RESTRINGIDA</p><h2>Acceso exclusivo para el administrador</h2><p>Inicia sesión con tu cuenta de administrador desde tu perfil para abrir el panel de control.</p><div class="result-buttons"><button class="primary-button" type="button" id="admin-login-btn">Abrir perfil ${ICONS.arrow}</button><a class="secondary-button" href="#inicio">Volver al inicio</a></div></section>`;
+    $('#admin-login-btn')?.addEventListener('click', openProfile);
+    return;
+  }
+
+  renderLoading('Cargando usuarios registrados...');
+  let users = [];
+  let loadError = null;
+  try {
+    users = await dataService.getAdminUsers();
+  } catch (err) {
+    loadError = err.message || 'No se pudo cargar la lista de usuarios.';
+  }
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => u.testsCompleted > 0).length;
+  const totalCompletedTests = users.reduce((sum, u) => sum + (Number(u.testsCompleted) || 0), 0);
+
+  function renderUserRow(u) {
+    const displayName = u.name?.trim() || 'Sin nombre definido';
+    const initial = (u.name?.trim() || u.email || 'U').charAt(0).toLocaleUpperCase('es');
+    const scoreBadge =
+      u.averageScore === null
+        ? '<span class="score-badge is-pending">Sin intentos</span>'
+        : `<span class="score-badge ${u.averageScore >= 80 ? 'is-high' : u.averageScore >= 60 ? 'is-mid' : 'is-low'}">Media: ${u.averageScore}%</span>`;
+
+    return `<div class="admin-user-row" data-search="${escapeHtml(`${displayName} ${u.email}`.toLowerCase())}">
+      <div class="admin-user-main">
+        <span class="avatar admin-user-avatar">${escapeHtml(initial)}</span>
+        <div class="admin-user-copy">
+          <div class="admin-user-title">
+            <strong>${escapeHtml(displayName)}</strong>
+            ${u.isAdmin ? '<span class="admin-role-badge">Admin</span>' : ''}
+          </div>
+          <span>${escapeHtml(u.email || 'Sin correo')}</span>
+        </div>
+      </div>
+      <div class="admin-user-dates">
+        <span>Registro: <strong>${escapeHtml(formatShortDate(u.createdAt))}</strong></span>
+        <span>Último acceso: <strong>${escapeHtml(formatShortDate(u.lastSignInAt))}</strong></span>
+      </div>
+      <div class="admin-user-metrics">
+        <span class="test-count">${u.testsCompleted} ${u.testsCompleted === 1 ? 'test' : 'tests'}</span>
+        ${scoreBadge}
+        ${u.pendingMistakes > 0 ? `<span class="score-badge is-low" title="Preguntas pendientes en Repasar fallos">${u.pendingMistakes} ${u.pendingMistakes === 1 ? 'fallo' : 'fallos'}</span>` : ''}
+      </div>
+    </div>`;
+  }
+
+  $('#page-content').innerHTML = `
+    <section class="welcome-row">
+      <div class="welcome-copy">
+        <p class="eyebrow">ESPACIO DE ADMINISTRACIÓN</p>
+        <h1>Panel de control<span>.</span></h1>
+        <p>Supervisa los estudiantes registrados y gestiona el contenido de la biblioteca.</p>
+      </div>
+      <div class="test-actions">
+        <button class="secondary-button" type="button" id="refresh-admin-btn">Actualizar datos</button>
+      </div>
+    </section>
+
+    <nav class="admin-tabs" aria-label="Secciones de administración">
+      <button class="admin-tab active" type="button">
+        ${ICONS.users}
+        <span>Usuarios registrados</span>
+        <span class="admin-tab-count">${totalUsers}</span>
+      </button>
+    </nav>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <span class="stat-icon purple">${ICONS.users}</span>
+        <div>
+          <span class="stat-label">Usuarios registrados</span>
+          <strong class="stat-number">${totalUsers}</strong>
+          <span class="stat-context">en Supabase Auth</span>
+        </div>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon green">${ICONS.check}</span>
+        <div>
+          <span class="stat-label">Estudiantes activos</span>
+          <strong class="stat-number">${activeUsers}</strong>
+          <span class="stat-context">con al menos 1 test</span>
+        </div>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon blue">${ICONS.book}</span>
+        <div>
+          <span class="stat-label">Tests realizados</span>
+          <strong class="stat-number">${totalCompletedTests}</strong>
+          <span class="stat-context">en total</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel section-panel">
+      <div class="panel-head admin-panel-head">
+        <div>
+          <h2>Directorio de usuarios (${totalUsers})</h2>
+          <p class="admin-panel-sub">Cuentas registradas, última conexión y resumen de actividad.</p>
+        </div>
+        <input id="admin-user-search" class="admin-search-input" type="search" placeholder="Buscar por nombre o correo..." />
+      </div>
+      ${
+        loadError
+          ? `<div class="admin-empty-state"><p>${escapeHtml(loadError)}</p></div>`
+          : users.length === 0
+          ? `<div class="admin-empty-state"><p>Todavía no hay usuarios registrados.</p></div>`
+          : `<div class="admin-user-list" id="admin-user-list">${users.map(renderUserRow).join('')}</div>`
+      }
+    </section>
+  `;
+
+  $('#refresh-admin-btn')?.addEventListener('click', () => renderAdmin());
+  $('#admin-user-search')?.addEventListener('input', (event) => {
+    const q = event.target.value.trim().toLowerCase();
+    document.querySelectorAll('#admin-user-list .admin-user-row').forEach((row) => {
+      const hay = row.dataset.search || '';
+      row.hidden = Boolean(q && !hay.includes(q));
+    });
+  });
+}
+
 async function renderRoute() {
   await renderSidebar();
   const parts = decodeURI(location.hash.slice(1)).split('/');
@@ -388,12 +542,14 @@ async function renderRoute() {
   if (parts[0] === 'tests') return renderTests(parts[1]);
   if (parts[0] === 'test') return startQuiz(parts[1], parts[2], parts[3]);
   if (parts[0] === 'repaso') return startReview(parts[1] || '');
+  if (parts[0] === 'admin') return renderAdmin();
   return renderHome();
 }
 
 $('#nav-home').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#inicio'; });
 $('#nav-subjects').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#asignaturas'; });
 $('#nav-tests').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#tests'; });
+$('#nav-admin')?.addEventListener('click', (event) => { event.preventDefault(); location.hash = '#admin'; });
 window.addEventListener('hashchange', renderRoute);
 $('#today-label').textContent = formatDate();
 
@@ -405,6 +561,9 @@ function updateProfileLabels() {
   document.querySelectorAll('.profile-initial').forEach((node) => {
     node.textContent = name === 'Mi espacio' ? 'E' : name.charAt(0).toLocaleUpperCase('es');
   });
+  if ($('#nav-admin')) {
+    $('#nav-admin').hidden = !dataService.isAdmin();
+  }
 }
 
 function renderAccountState() {
