@@ -434,12 +434,20 @@ export const dataService = {
           const topicData = mergeLocalSectionsIntoTopicDetails(subjectId, topicId, {
             id: topicId,
             subjectId,
-            sections: sectionsData.map((sec) => ({
-              id: sec.id,
-              name: sec.name,
-              description: sec.description,
-              questions: (sec.questions || []).sort((a, b) => a.display_order - b.display_order)
-            }))
+            sections: sectionsData.map((sec) => {
+              const sorted = (sec.questions || []).sort((a, b) => a.display_order - b.display_order);
+              const byQuestionText = new Map();
+              for (const q of sorted) {
+                const key = String(q.question || '').trim().toLowerCase();
+                byQuestionText.set(key || q.id, q);
+              }
+              return {
+                id: sec.id,
+                name: sec.name,
+                description: sec.description,
+                questions: Array.from(byQuestionText.values())
+              };
+            })
           });
           topicDetailsCache.set(cacheKey, topicData);
           return topicData;
@@ -568,6 +576,89 @@ export const dataService = {
     });
 
     return { uploaded: true };
+  },
+
+  /**
+   * Sube automáticamente a Supabase cualquier test generado con IA que hubiera quedado guardado
+   * solo en localStorage (por ejemplo, antes de activar los permisos de inserción en la BD).
+   */
+  async syncLocalGeneratedSectionsToSupabase() {
+    if (!SUPABASE_CONFIG.enabled || !SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) {
+      return 0;
+    }
+    const store = readLocalGeneratedSections();
+    const entries = Object.entries(store);
+    if (entries.length === 0) return 0;
+
+    let uploadedCount = 0;
+    const remainingStore = {};
+
+    for (const [key, sectionsList] of entries) {
+      if (!Array.isArray(sectionsList) || sectionsList.length === 0) continue;
+      const [subjectId, topicId] = key.split('/');
+      if (!subjectId || !topicId) continue;
+
+      let remoteSections = [];
+      try {
+        remoteSections =
+          (await supabaseFetch(
+            'sections',
+            `subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&select=id,questions(count)`
+          )) || [];
+      } catch (err) {
+        console.warn('No se pudo comprobar secciones remotas para migrar tests locales:', err);
+        remainingStore[key] = sectionsList;
+        continue;
+      }
+
+      const remoteMap = new Map(
+        remoteSections.map((s) => [s.id, s.questions?.[0]?.count || 0])
+      );
+
+      const pendingForTopic = [];
+      for (const localSec of sectionsList) {
+        if (!localSec?.id || !Array.isArray(localSec.questions) || localSec.questions.length === 0) {
+          continue;
+        }
+        const remoteQCount = remoteMap.get(localSec.id) || 0;
+        if (remoteQCount > 0) {
+          // Ya existe en Supabase con sus preguntas; lo retiramos de localStorage
+          continue;
+        }
+        try {
+          await this.uploadSectionToSupabase(
+            { id: subjectId },
+            { id: topicId },
+            localSec,
+            remoteSections.length + uploadedCount + 10
+          );
+          uploadedCount += 1;
+          topicDetailsCache.delete(key);
+        } catch (err) {
+          console.warn(`No se pudo migrar el test local "${localSec.name}" a Supabase:`, err);
+          pendingForTopic.push(localSec);
+        }
+      }
+
+      if (pendingForTopic.length > 0) {
+        remainingStore[key] = pendingForTopic;
+      }
+    }
+
+    try {
+      if (Object.keys(remainingStore).length === 0) {
+        localStorage.removeItem(GENERATED_SECTIONS_KEY);
+      } else {
+        localStorage.setItem(GENERATED_SECTIONS_KEY, JSON.stringify(remainingStore));
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    if (uploadedCount > 0) {
+      catalogCache = null;
+    }
+    return uploadedCount;
   },
 
   /**

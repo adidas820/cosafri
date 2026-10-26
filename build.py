@@ -180,6 +180,17 @@ def sync_catalog_to_supabase():
             if q_rows:
                 supabase_request('POST', 'questions?on_conflict=id', supabase_service_key, q_rows, upsert_headers)
                 total_q += len(q_rows)
+            if sec_ids and q_rows:
+                # Limpiar preguntas duplicadas antiguas (con UUID aleatorio previo) manteniendo las deterministas y las de IA
+                sec_filter = ','.join(urllib.parse.quote(s, safe='') for s in sec_ids)
+                ids_filter = ','.join(urllib.parse.quote(r['id'], safe='') for r in q_rows)
+                del_path = (
+                    f"questions?subject_id=eq.{urllib.parse.quote(sub_id, safe='')}"
+                    f"&topic_id=eq.{urllib.parse.quote(top_id, safe='')}"
+                    f"&section_id=in.({sec_filter})"
+                    f"&id=not.in.({ids_filter})"
+                )
+                supabase_request('DELETE', del_path, supabase_service_key)
 
         print(
             f"✓ Sincronización completada: {len(subjects_payload)} asignaturas, "

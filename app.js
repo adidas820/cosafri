@@ -666,5 +666,14 @@ if (authResult?.error) {
   showToast(`Sesión iniciada como ${dataService.getUser()?.email || ''}.`, 4000);
 }
 
+// Sincronizar automáticamente con Supabase cualquier test generado antes que estuviera solo en localStorage
+const migratedCount = await dataService.syncLocalGeneratedSectionsToSupabase().catch(() => 0);
+if (migratedCount > 0) {
+  showToast(
+    `${migratedCount} ${migratedCount === 1 ? 'cuestionario local subido' : 'cuestionarios locales subidos'} automáticamente a Supabase.`,
+    5000
+  );
+}
+
 updateProfileLabels();
 renderRoute();
