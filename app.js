@@ -403,8 +403,23 @@ function formatShortDate(iso) {
   }).format(d);
 }
 
-async function renderAdmin() {
+async function estimatePdfPages(file) {
+  try {
+    const buffer = await file.arrayBuffer();
+    const text = new TextDecoder('latin1').decode(buffer);
+    const matches = text.match(/\/Type\s*\/Page\b(?!s)/g);
+    if (matches && matches.length > 0) {
+      return matches.length;
+    }
+  } catch {
+    // ignore estimation error
+  }
+  return 1;
+}
+
+async function renderAdmin(activeTab = 'usuarios') {
   activeQuiz = null;
+  const tab = activeTab === 'contenido' ? 'contenido' : 'usuarios';
   setNavigation('admin', 'Panel Admin');
 
   if (!dataService.isAdmin()) {
@@ -413,7 +428,301 @@ async function renderAdmin() {
     return;
   }
 
-  renderLoading('Cargando usuarios registrados...');
+  renderLoading(tab === 'contenido' ? 'Cargando catálogo de asignaturas y temarios...' : 'Cargando usuarios registrados...');
+  const catalog = await dataService.getCatalog();
+
+  if (tab === 'contenido') {
+    const topicTotal = totalTopics(catalog);
+    $('#page-content').innerHTML = `
+      <section class="welcome-row">
+        <div class="welcome-copy">
+          <p class="eyebrow">ESPACIO DE ADMINISTRACIÓN</p>
+          <h1>Panel de control<span>.</span></h1>
+          <p>Crea nuevas asignaturas y sube temarios en PDF directamente a Supabase Storage sin tocar Git.</p>
+        </div>
+        <div class="test-actions">
+          <button class="secondary-button" type="button" id="refresh-admin-btn">Actualizar datos</button>
+        </div>
+      </section>
+
+      <nav class="admin-tabs" aria-label="Secciones de administración">
+        <button class="admin-tab" type="button" data-admin-tab="usuarios">
+          ${ICONS.users}
+          <span>Usuarios registrados</span>
+        </button>
+        <button class="admin-tab active" type="button" data-admin-tab="contenido">
+          ${ICONS.folder}
+          <span>Asignaturas y Temarios</span>
+          <span class="admin-tab-count">${catalog.length} · ${topicTotal}</span>
+        </button>
+      </nav>
+
+      <div class="admin-forms-grid">
+        <section class="panel admin-form-card">
+          <p class="eyebrow">NUEVA ASIGNATURA</p>
+          <h2>Crear asignatura</h2>
+          <p class="admin-panel-sub">Se guardará directamente en la tabla <code>subjects</code> de Supabase.</p>
+          <form id="admin-create-subject-form" class="gen-quiz-form">
+            <label class="profile-name-field">
+              <span>Nombre de la asignatura</span>
+              <input id="admin-subj-name" type="text" maxlength="80" required placeholder="Ej.: Historia Contemporánea" />
+            </label>
+            <label class="profile-name-field">
+              <span>Descripción breve</span>
+              <input id="admin-subj-desc" type="text" maxlength="180" required placeholder="Ej.: Procesos políticos, sociales y económicos de los siglos XIX y XX." />
+            </label>
+            <label class="profile-name-field">
+              <span>Color identificativo</span>
+              <select id="admin-subj-color">
+                <option value="violet">Violeta / Rosa</option>
+                <option value="amber">Ámbar / Dorado</option>
+                <option value="green">Verde</option>
+                <option value="blue">Azul</option>
+              </select>
+            </label>
+            <div class="gen-modal-actions">
+              <button class="primary-button" id="admin-subj-submit" type="submit">${ICONS.folder} Crear asignatura</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel admin-form-card">
+          <p class="eyebrow">SUBIR TEMARIO PDF A SUPABASE STORAGE</p>
+          <h2>Añadir temario en PDF</h2>
+          <p class="admin-panel-sub">Sube el archivo PDF al bucket público <code>temarios</code> y regístralo en la asignatura.</p>
+          <form id="admin-create-topic-form" class="gen-quiz-form">
+            <label class="profile-name-field">
+              <span>Asignatura de destino</span>
+              <select id="admin-topic-subject" required>
+                ${
+                  catalog.length
+                    ? catalog.map((sub) => `<option value="${escapeHtml(sub.id)}">${escapeHtml(sub.name)}</option>`).join('')
+                    : '<option value="">Crea primero una asignatura</option>'
+                }
+              </select>
+            </label>
+            <label class="profile-name-field">
+              <span>Título del temario</span>
+              <input id="admin-topic-name" type="text" maxlength="120" required placeholder="Ej.: Tema 2 · La atmósfera y el clima" />
+            </label>
+            <div class="gen-form-row">
+              <label class="profile-name-field">
+                <span>Archivo PDF</span>
+                <input id="admin-topic-file" class="admin-file-input" type="file" accept="application/pdf,.pdf" required />
+              </label>
+              <label class="profile-name-field">
+                <span>Páginas (auto)</span>
+                <input id="admin-topic-pages" type="number" min="1" max="999" value="1" required />
+              </label>
+            </div>
+            <label class="admin-checkbox-row">
+              <input id="admin-topic-gen-ai" type="checkbox" checked />
+              <span>Abrir el generador de test con IA al terminar de subir el PDF</span>
+            </label>
+            <div class="gen-quiz-status" id="admin-topic-status" hidden>
+              <div class="loading-spinner small-spinner" aria-hidden="true"></div>
+              <span id="admin-topic-status-text">Subiendo PDF a Supabase Storage...</span>
+            </div>
+            <div class="gen-modal-actions">
+              <button class="primary-button" id="admin-topic-submit" type="submit" ${catalog.length ? '' : 'disabled'}>${ICONS.file} Subir PDF y crear temario</button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <section class="panel section-panel">
+        <div class="panel-head admin-panel-head">
+          <div>
+            <h2>Asignaturas y temarios actuales (${catalog.length})</h2>
+            <p class="admin-panel-sub">Gestiona el catálogo activo en Supabase, abre sus PDFs o genera nuevos tests.</p>
+          </div>
+        </div>
+        <div class="subject-list-accordion admin-catalog-list">
+          ${
+            catalog.length === 0
+              ? '<div class="admin-empty-state"><p>No hay asignaturas registradas todavía.</p></div>'
+              : catalog
+                  .map(
+                    (subject) => `<details class="subject-accordion" open>
+                      <summary>
+                        <span class="summary-left">
+                          ${iconTile(ICONS.folder, subject.color)}
+                          <span class="summary-title">
+                            <strong>${escapeHtml(subject.name)}</strong>
+                            <span>ID: ${escapeHtml(subject.id)} · ${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span>
+                          </span>
+                        </span>
+                        <span class="topic-actions">
+                          <button class="icon-danger-button" type="button" data-delete-subject="${escapeHtml(subject.id)}" data-name="${escapeHtml(subject.name)}" title="Eliminar asignatura completa">${ICONS.trash}</button>
+                          <span class="chevron">${ICONS.chevron}</span>
+                        </span>
+                      </summary>
+                      <div class="topic-list">
+                        ${
+                          subject.topics.length === 0
+                            ? '<div class="topic-row"><span class="topic-copy"><span>Sin temarios todavía. Sube un PDF desde el formulario superior.</span></span></div>'
+                            : subject.topics
+                                .map(
+                                  (topic, idx) => `<div class="topic-row">
+                                    <a class="topic-copy" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">
+                                      <span class="topic-number small-number">${idx + 1}</span>
+                                      <span>
+                                        <strong>${escapeHtml(topic.name)}</strong>
+                                        <span>${topic.pages} ${topic.pages === 1 ? 'página' : 'páginas'} · ${topic.sections.length} tests · ${escapeHtml(topic.file.startsWith('http') ? 'Supabase Storage' : topic.file)}</span>
+                                      </span>
+                                    </a>
+                                    <span class="topic-actions">
+                                      <button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Test IA</button>
+                                      <a class="secondary-button" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">Ver PDF ${ICONS.arrow}</a>
+                                      <button class="icon-danger-button" type="button" data-delete-topic="${escapeHtml(topic.id)}" data-subject="${escapeHtml(subject.id)}" data-name="${escapeHtml(topic.name)}" title="Eliminar este temario">${ICONS.trash}</button>
+                                    </span>
+                                  </div>`
+                                )
+                                .join('')
+                        }
+                      </div>
+                    </details>`
+                  )
+                  .join('')
+          }
+        </div>
+      </section>
+    `;
+
+    bindGenerateButtons();
+
+    $('#page-content').querySelectorAll('[data-admin-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const nextTab = btn.dataset.adminTab;
+        location.hash = nextTab === 'contenido' ? '#admin/contenido' : '#admin';
+      });
+    });
+
+    $('#refresh-admin-btn')?.addEventListener('click', async () => {
+      await dataService.getCatalog(true);
+      renderAdmin('contenido');
+    });
+
+    $('#admin-topic-file')?.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const pages = await estimatePdfPages(file);
+      $('#admin-topic-pages').value = pages;
+      const nameInput = $('#admin-topic-name');
+      if (!nameInput.value.trim()) {
+        nameInput.value = file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ');
+      }
+    });
+
+    $('#admin-create-subject-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = $('#admin-subj-name').value.trim();
+      const description = $('#admin-subj-desc').value.trim();
+      const color = $('#admin-subj-color').value;
+      if (!name) return;
+
+      const btn = $('#admin-subj-submit');
+      btn.disabled = true;
+      btn.textContent = 'Creando asignatura...';
+      try {
+        const created = await dataService.createSubject({ name, description, color });
+        await renderSidebar();
+        showToast(`Asignatura "${created?.name || name}" creada en Supabase.`, 4500);
+        renderAdmin('contenido');
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `${ICONS.folder} Crear asignatura`;
+        showToast(err.message || 'No se pudo crear la asignatura.', 5000);
+      }
+    });
+
+    $('#admin-create-topic-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const subjectId = $('#admin-topic-subject').value;
+      const name = $('#admin-topic-name').value.trim();
+      const pages = Number($('#admin-topic-pages').value) || 1;
+      const file = $('#admin-topic-file').files?.[0];
+      const openAiAfter = $('#admin-topic-gen-ai').checked;
+
+      if (!subjectId || !name || !file) {
+        showToast('Completa la asignatura, el título y selecciona un archivo PDF.');
+        return;
+      }
+
+      const submitBtn = $('#admin-topic-submit');
+      const statusBox = $('#admin-topic-status');
+      const statusText = $('#admin-topic-status-text');
+      submitBtn.disabled = true;
+      statusBox.hidden = false;
+
+      try {
+        const topic = await dataService.createTopicWithPdf({
+          subjectId,
+          name,
+          pages,
+          file,
+          onProgress: (msg) => {
+            statusText.textContent = msg;
+          }
+        });
+        await renderSidebar();
+        showToast(`Temario "${topic?.name || name}" subido a Supabase Storage.`, 4500);
+        await renderAdmin('contenido');
+        if (openAiAfter && topic?.id) {
+          openGenerateQuizModal(subjectId, topic.id);
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        statusBox.hidden = true;
+        showToast(err.message || 'No se pudo subir el PDF del temario.', 5500);
+      }
+    });
+
+    $('#page-content').querySelectorAll('[data-delete-subject]').forEach((btn) => {
+      btn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const subjectId = btn.dataset.deleteSubject;
+        const name = btn.dataset.name || subjectId;
+        if (!confirm(`¿Seguro que quieres eliminar la asignatura "${name}" y todos sus temarios y tests asociados?`)) {
+          return;
+        }
+        btn.disabled = true;
+        try {
+          await dataService.deleteSubject(subjectId);
+          await renderSidebar();
+          showToast(`Asignatura "${name}" eliminada.`);
+          renderAdmin('contenido');
+        } catch (err) {
+          btn.disabled = false;
+          showToast(err.message || 'No se pudo eliminar la asignatura.', 5000);
+        }
+      });
+    });
+
+    $('#page-content').querySelectorAll('[data-delete-topic]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const topicId = btn.dataset.deleteTopic;
+        const subjectId = btn.dataset.subject;
+        const name = btn.dataset.name || topicId;
+        if (!confirm(`¿Seguro que quieres eliminar el temario "${name}" y sus tests asociados?`)) {
+          return;
+        }
+        btn.disabled = true;
+        try {
+          await dataService.deleteTopic(subjectId, topicId);
+          showToast(`Temario "${name}" eliminado.`);
+          renderAdmin('contenido');
+        } catch (err) {
+          btn.disabled = false;
+          showToast(err.message || 'No se pudo eliminar el temario.', 5000);
+        }
+      });
+    });
+
+    return;
+  }
+
   let users = [];
   let loadError = null;
   try {
@@ -470,10 +779,15 @@ async function renderAdmin() {
     </section>
 
     <nav class="admin-tabs" aria-label="Secciones de administración">
-      <button class="admin-tab active" type="button">
+      <button class="admin-tab active" type="button" data-admin-tab="usuarios">
         ${ICONS.users}
         <span>Usuarios registrados</span>
         <span class="admin-tab-count">${totalUsers}</span>
+      </button>
+      <button class="admin-tab" type="button" data-admin-tab="contenido">
+        ${ICONS.folder}
+        <span>Asignaturas y Temarios</span>
+        <span class="admin-tab-count">${catalog.length} · ${totalTopics(catalog)}</span>
       </button>
     </nav>
 
@@ -522,7 +836,14 @@ async function renderAdmin() {
     </section>
   `;
 
-  $('#refresh-admin-btn')?.addEventListener('click', () => renderAdmin());
+  $('#page-content').querySelectorAll('[data-admin-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const nextTab = btn.dataset.adminTab;
+      location.hash = nextTab === 'contenido' ? '#admin/contenido' : '#admin';
+    });
+  });
+
+  $('#refresh-admin-btn')?.addEventListener('click', () => renderAdmin('usuarios'));
   $('#admin-user-search')?.addEventListener('input', (event) => {
     const q = event.target.value.trim().toLowerCase();
     document.querySelectorAll('#admin-user-list .admin-user-row').forEach((row) => {
@@ -542,7 +863,7 @@ async function renderRoute() {
   if (parts[0] === 'tests') return renderTests(parts[1]);
   if (parts[0] === 'test') return startQuiz(parts[1], parts[2], parts[3]);
   if (parts[0] === 'repaso') return startReview(parts[1] || '');
-  if (parts[0] === 'admin') return renderAdmin();
+  if (parts[0] === 'admin') return renderAdmin(parts[1] || 'usuarios');
   return renderHome();
 }
 

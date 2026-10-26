@@ -136,4 +136,15 @@
 .admin-user-dates strong{color:var(--ink);font-weight:600}
 .admin-user-metrics{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
 .admin-empty-state{padding:28px 18px;text-align:center;color:var(--muted);font-size:11px}
+.admin-forms-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:20px;align-items:start}
+.admin-form-card{padding:20px 22px}
+.admin-form-card h2{font:600 18px var(--display);margin:0 0 4px}
+.admin-form-card .admin-panel-sub{margin-bottom:16px}
+.admin-form-card code{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--panel-2);color:var(--accent)}
+:root[data-theme="light"] .admin-form-card code{color:var(--accent-2)}
+.admin-file-input{padding:7px 9px!important;cursor:pointer}
+.admin-checkbox-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:2px}
+.admin-checkbox-row input[type="checkbox"]{accent-color:var(--accent-2);width:14px;height:14px;cursor:pointer}
+.admin-catalog-list{padding-top:14px}
+@media(max-width:900px){.admin-forms-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.admin-search-input{width:100%}.admin-user-row{align-items:flex-start;flex-direction:column}.admin-user-metrics{justify-content:flex-start}}

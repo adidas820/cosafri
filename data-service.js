@@ -1029,19 +1029,21 @@ export const dataService = {
   },
 
   /**
-   * Obtiene la lista de usuarios registrados desde el endpoint de administración.
+   * Llamada genérica autenticada al endpoint de administración (/.netlify/functions/admin).
    */
-  async getAdminUsers() {
+  async adminRequest(action, method = 'GET', body = null) {
     if (!this.isAdmin()) {
       throw new Error('Acceso restringido al administrador.');
     }
     const token = await getValidAccessToken();
-    const resp = await fetch('/.netlify/functions/admin?action=users', {
-      method: 'GET',
+    const resp = await fetch(`/.netlify/functions/admin?action=${encodeURIComponent(action)}`, {
+      method,
       headers: {
         'Accept': 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
+      },
+      body: body ? JSON.stringify(body) : undefined
     });
     const contentType = resp.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
@@ -1051,9 +1053,120 @@ export const dataService = {
     }
     const data = await resp.json();
     if (!resp.ok) {
-      throw new Error(data?.error || `Error al obtener usuarios (${resp.status}).`);
+      throw new Error(data?.error || `Error en operación de administrador (${resp.status}).`);
     }
+    return data;
+  },
+
+  /**
+   * Obtiene la lista de usuarios registrados desde el endpoint de administración.
+   */
+  async getAdminUsers() {
+    const data = await this.adminRequest('users', 'GET');
     return Array.isArray(data?.users) ? data.users : [];
+  },
+
+  /**
+   * Crea una nueva asignatura en Supabase desde el panel de administración.
+   */
+  async createSubject({ id = '', name, description = '', color = 'violet' }) {
+    const data = await this.adminRequest('create-subject', 'POST', {
+      id,
+      name,
+      description,
+      color
+    });
+    catalogCache = null;
+    await this.getCatalog(true);
+    return data?.subject;
+  },
+
+  /**
+   * Sube un nuevo PDF de temario al bucket público `temarios` de Supabase Storage
+   * y registra el temario en la tabla `topics`.
+   */
+  async createTopicWithPdf({
+    subjectId,
+    name,
+    topicId = '',
+    pages = 1,
+    file,
+    onProgress = () => {}
+  }) {
+    if (!file) {
+      throw new Error('Selecciona un archivo PDF para el temario.');
+    }
+    onProgress('Preparando el bucket de almacenamiento en Supabase...');
+    const prep = await this.adminRequest('prepare-topic-upload', 'POST', {
+      subjectId,
+      name,
+      topicId
+    });
+
+    const subject = await this.getSubject(subjectId);
+    const displayOrder = (subject?.topics?.length || 0) + 1;
+
+    let uploadedDirect = false;
+    if (prep?.signedUploadUrl) {
+      try {
+        onProgress('Subiendo el archivo PDF a Supabase Storage...');
+        const upResp = await fetch(prep.signedUploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/pdf',
+            'x-upsert': 'true'
+          },
+          body: file
+        });
+        if (upResp.ok) {
+          uploadedDirect = true;
+        }
+      } catch (err) {
+        console.warn('Fallo en subida firmada directa, usando subida vía función:', err);
+      }
+    }
+
+    let pdfBase64 = null;
+    if (!uploadedDirect) {
+      onProgress('Subiendo PDF a través del servidor...');
+      const buffer = await file.arrayBuffer();
+      pdfBase64 = arrayBufferToBase64(buffer);
+    }
+
+    onProgress('Registrando el nuevo temario en la base de datos...');
+    const data = await this.adminRequest('create-topic', 'POST', {
+      subjectId,
+      topicId: prep?.topicId || topicId,
+      name,
+      pages,
+      displayOrder,
+      fileUrl: prep?.publicUrl || '',
+      storagePath: prep?.storagePath || '',
+      pdfBase64
+    });
+
+    catalogCache = null;
+    await this.getCatalog(true);
+    return data?.topic;
+  },
+
+  /**
+   * Elimina una asignatura completa desde el panel de administración.
+   */
+  async deleteSubject(subjectId) {
+    await this.adminRequest('delete-subject', 'DELETE', { subjectId });
+    catalogCache = null;
+    await this.getCatalog(true);
+  },
+
+  /**
+   * Elimina un temario desde el panel de administración.
+   */
+  async deleteTopic(subjectId, topicId) {
+    await this.adminRequest('delete-topic', 'DELETE', { subjectId, topicId });
+    catalogCache = null;
+    topicDetailsCache.delete(`${subjectId}/${topicId}`);
+    await this.getCatalog(true);
   },
 
   async initAuth() {
