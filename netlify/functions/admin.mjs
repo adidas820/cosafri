@@ -241,6 +241,192 @@ export const handler = async (event) => {
     }
   }
 
+  // Acción pública de comunidad: directorio de estudiantes + feed de actividad reciente
+  if (event.httpMethod === 'GET' && action === 'community') {
+    try {
+      const [authUsersResp, profilesResp, scoresResp] = await Promise.all([
+        fetch(`${supabaseUrl}/auth/v1/admin/users?page=1&per_page=200`, { headers: sbHeaders }),
+        fetch(`${supabaseUrl}/rest/v1/student_profiles?select=id,name,is_admin`, { headers: sbHeaders }).catch(() => null),
+        fetch(`${supabaseUrl}/rest/v1/quiz_scores?select=user_id,subject,section,score,total,percentage,created_at&order=created_at.desc&limit=250`, { headers: sbHeaders }).catch(() => null)
+      ]);
+
+      const authData = authUsersResp.ok ? await authUsersResp.json().catch(() => ({})) : {};
+      const rawUsers = Array.isArray(authData?.users) ? authData.users : Array.isArray(authData) ? authData : [];
+      const profiles = profilesResp && profilesResp.ok ? await profilesResp.json().catch(() => []) : [];
+      const scores = scoresResp && scoresResp.ok ? await scoresResp.json().catch(() => []) : [];
+
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+      const scoresByUser = new Map();
+      for (const s of scores || []) {
+        if (!s.user_id) continue;
+        const entry = scoresByUser.get(s.user_id) || { count: 0, sum: 0, correct: 0, total: 0 };
+        entry.count += 1;
+        entry.sum += Number(s.percentage) || 0;
+        entry.correct += Number(s.score) || 0;
+        entry.total += Number(s.total) || 0;
+        scoresByUser.set(s.user_id, entry);
+      }
+
+      const adminEmailEnv = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+      const userLookup = new Map();
+
+      const users = rawUsers
+        .map((u) => {
+          const prof = profileMap.get(u.id);
+          const sc = scoresByUser.get(u.id) || { count: 0, sum: 0, correct: 0, total: 0 };
+          const email = u.email || '';
+          const rawName = (prof?.name || u.user_metadata?.name || '').trim();
+          const emailPrefix = email ? email.split('@')[0].replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase() : 'estudiante';
+          const displayName = rawName || emailPrefix || 'Estudiante';
+          const handle = `@${emailPrefix || slugify(displayName) || 'estudiante'}`;
+          const isAdmin =
+            Boolean(prof?.is_admin) ||
+            u.app_metadata?.role === 'admin' ||
+            u.user_metadata?.role === 'admin' ||
+            Boolean(adminEmailEnv && email.toLowerCase() === adminEmailEnv);
+
+          const pubUser = {
+            id: u.id,
+            name: displayName,
+            handle,
+            avatar: u.user_metadata?.avatar_url || '',
+            bio: u.user_metadata?.bio || '',
+            banner: u.user_metadata?.banner || 'gold',
+            isAdmin,
+            createdAt: u.created_at || null,
+            testsCompleted: sc.count,
+            averageScore: sc.count > 0 ? Math.round(sc.sum / sc.count) : null,
+            totalCorrect: Math.round(sc.correct * 10) / 10,
+            totalQuestions: sc.total
+          };
+          userLookup.set(u.id, pubUser);
+          return pubUser;
+        })
+        .sort((a, b) => b.testsCompleted - a.testsCompleted || (b.averageScore || 0) - (a.averageScore || 0));
+
+      const feed = (scores || [])
+        .filter((s) => s.user_id && userLookup.has(s.user_id))
+        .slice(0, 30)
+        .map((s) => {
+          const u = userLookup.get(s.user_id);
+          return {
+            userId: u.id,
+            userName: u.name,
+            userHandle: u.handle,
+            userAvatar: u.avatar,
+            isAdmin: u.isAdmin,
+            subject: s.subject,
+            section: s.section,
+            score: s.score,
+            total: s.total,
+            percentage: s.percentage,
+            date: s.created_at
+          };
+        });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ users, feed })
+      };
+    } catch (err) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: err.message || 'No se pudo cargar la comunidad.' })
+      };
+    }
+  }
+
+  // Acción pública para ver el perfil de otro usuario (#usuario/<id>)
+  if (event.httpMethod === 'GET' && action === 'public-profile') {
+    const targetUserId = String(event.queryStringParameters?.userId || '').trim();
+    if (!targetUserId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Falta el identificador del usuario.' })
+      };
+    }
+
+    try {
+      const [uResp, profResp, scoresResp] = await Promise.all([
+        fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(targetUserId)}`, { headers: sbHeaders }),
+        fetch(`${supabaseUrl}/rest/v1/student_profiles?id=eq.${encodeURIComponent(targetUserId)}&select=id,name,is_admin`, { headers: sbHeaders }).catch(() => null),
+        fetch(`${supabaseUrl}/rest/v1/quiz_scores?user_id=eq.${encodeURIComponent(targetUserId)}&select=subject,section,score,total,percentage,created_at&order=created_at.desc&limit=40`, { headers: sbHeaders }).catch(() => null)
+      ]);
+
+      if (!uResp.ok) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ error: 'No se encontró el perfil de este estudiante.' })
+        };
+      }
+
+      const u = await uResp.json();
+      const profRows = profResp && profResp.ok ? await profResp.json().catch(() => []) : [];
+      const prof = Array.isArray(profRows) ? profRows[0] : null;
+      const rawScores = scoresResp && scoresResp.ok ? await scoresResp.json().catch(() => []) : [];
+
+      const email = u.email || '';
+      const rawName = (prof?.name || u.user_metadata?.name || '').trim();
+      const emailPrefix = email ? email.split('@')[0].replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase() : 'estudiante';
+      const displayName = rawName || emailPrefix || 'Estudiante';
+      const handle = `@${emailPrefix || slugify(displayName) || 'estudiante'}`;
+      const adminEmailEnv = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+      const isAdmin =
+        Boolean(prof?.is_admin) ||
+        u.app_metadata?.role === 'admin' ||
+        u.user_metadata?.role === 'admin' ||
+        Boolean(adminEmailEnv && email.toLowerCase() === adminEmailEnv);
+
+      const scores = (rawScores || []).map((r) => ({
+        subject: r.subject,
+        section: r.section,
+        score: r.score,
+        total: r.total,
+        percentage: r.percentage,
+        date: r.created_at
+      }));
+
+      const attempts = scores.length;
+      const totalQuestions = scores.reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+      const totalCorrect = Math.round(scores.reduce((sum, s) => sum + (Number(s.score) || 0), 0) * 10) / 10;
+      const averageScore = attempts
+        ? Math.round(scores.reduce((sum, s) => sum + (Number(s.percentage) || 0), 0) / attempts)
+        : null;
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          profile: {
+            id: u.id,
+            name: displayName,
+            handle,
+            avatar: u.user_metadata?.avatar_url || '',
+            bio: u.user_metadata?.bio || '',
+            banner: u.user_metadata?.banner || 'gold',
+            isAdmin,
+            createdAt: u.created_at || null,
+            testsCompleted: attempts,
+            averageScore,
+            totalCorrect,
+            totalQuestions
+          },
+          scores
+        })
+      };
+    } catch (err) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: err.message || 'No se pudo cargar el perfil del usuario.' })
+      };
+    }
+  }
+
   const authCheck = await verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey, parsedBody);
   if (!authCheck.ok) {
     return {

@@ -77,6 +77,7 @@ function setNavigation(section, label) {
   $('#nav-home').classList.toggle('active', section === 'home');
   $('#nav-subjects').classList.toggle('active', section === 'subjects');
   $('#nav-tests').classList.toggle('active', section === 'tests');
+  $('#nav-community')?.classList.toggle('active', section === 'community');
   $('#nav-profile')?.classList.toggle('active', section === 'profile');
   $('#nav-admin')?.classList.toggle('active', section === 'admin');
   const defaultLabel =
@@ -84,6 +85,8 @@ function setNavigation(section, label) {
       ? 'Inicio'
       : section === 'subjects'
       ? 'Asignaturas'
+      : section === 'community'
+      ? 'Comunidad'
       : section === 'profile'
       ? 'Perfil'
       : section === 'admin'
@@ -957,7 +960,7 @@ async function renderAdmin(activeTab = 'usuarios') {
         : `<span class="score-badge ${u.averageScore >= 80 ? 'is-high' : u.averageScore >= 60 ? 'is-mid' : 'is-low'}">Media: ${u.averageScore}%</span>`;
 
     return `<div class="admin-user-row" data-search="${escapeHtml(`${displayName} ${u.email}`.toLowerCase())}">
-      <div class="admin-user-main">
+      <a class="admin-user-main" href="#usuario/${encodeURIComponent(u.id)}" title="Ver perfil público de ${escapeHtml(displayName)}">
         <span class="avatar admin-user-avatar">${avatarHtml}</span>
         <div class="admin-user-copy">
           <div class="admin-user-title">
@@ -966,7 +969,7 @@ async function renderAdmin(activeTab = 'usuarios') {
           </div>
           <span>${escapeHtml(u.email || 'Sin correo')}</span>
         </div>
-      </div>
+      </a>
       <div class="admin-user-dates">
         <span>Registro: <strong>${escapeHtml(formatShortDate(u.createdAt))}</strong></span>
         <span>Último acceso: <strong>${escapeHtml(formatShortDate(u.lastSignInAt))}</strong></span>
@@ -975,6 +978,7 @@ async function renderAdmin(activeTab = 'usuarios') {
         <span class="test-count">${u.testsCompleted} ${u.testsCompleted === 1 ? 'test' : 'tests'}</span>
         ${scoreBadge}
         ${u.pendingMistakes > 0 ? `<span class="score-badge is-low" title="Preguntas pendientes en Repasar fallos">${u.pendingMistakes} ${u.pendingMistakes === 1 ? 'fallo' : 'fallos'}</span>` : ''}
+        <a class="secondary-button" href="#usuario/${encodeURIComponent(u.id)}">Ver perfil ${ICONS.arrow}</a>
       </div>
     </div>`;
   }
@@ -1281,9 +1285,10 @@ async function renderProfile(tab = 'actividad') {
             ${avatarInnerHtml}
           </button>
           <div class="x-profile-actions">
+            <a class="secondary-button x-edit-btn" href="#comunidad">${ICONS.users} Comunidad</a>
             ${
               mistakes.length > 0
-                ? `<a class="secondary-button" href="#repaso">${ICONS.target} Repasar ${mistakes.length} ${mistakes.length === 1 ? 'fallo' : 'fallos'}</a>`
+                ? `<a class="secondary-button x-edit-btn" href="#repaso">${ICONS.target} Fallos (${mistakes.length})</a>`
                 : ''
             }
             <button class="secondary-button x-edit-btn" id="x-open-edit-modal" type="button">Editar perfil</button>
@@ -1444,6 +1449,352 @@ async function renderProfile(tab = 'actividad') {
   });
 }
 
+async function renderCommunity(activeTab = 'estudiantes') {
+  stopExamTimer();
+  const tab = activeTab === 'actividad' ? 'actividad' : 'estudiantes';
+  setNavigation('community', 'Comunidad');
+  renderLoading('Cargando comunidad de estudiantes...');
+
+  let users = [];
+  let feed = [];
+  let loadError = null;
+  try {
+    const res = await dataService.getCommunityData();
+    users = res.users;
+    feed = res.feed;
+  } catch (err) {
+    loadError = err.message || 'No se pudo cargar la comunidad.';
+  }
+
+  const myUserId = dataService.getUser()?.id || '';
+
+  const userCardsHtml = users
+    .map((u) => {
+      const initial = (u.name || 'E').charAt(0).toLocaleUpperCase('es');
+      const avatarHtml = u.avatar
+        ? `<img class="avatar-img" src="${escapeHtml(u.avatar)}" alt="${escapeHtml(u.name)}" />`
+        : escapeHtml(initial);
+      const scoreBadge =
+        u.averageScore === null
+          ? '<span class="score-badge is-pending">Sin intentos</span>'
+          : `<span class="score-badge ${u.averageScore >= 80 ? 'is-high' : u.averageScore >= 60 ? 'is-mid' : 'is-low'}">Media: ${u.averageScore}%</span>`;
+      const isMe = myUserId && u.id === myUserId;
+      const targetHref = isMe ? '#perfil' : `#usuario/${encodeURIComponent(u.id)}`;
+
+      return `<a class="x-user-card" href="${targetHref}" data-search="${escapeHtml(`${u.name} ${u.handle} ${u.bio || ''}`.toLowerCase())}">
+        <div class="x-user-card-banner" data-banner="${escapeHtml(u.banner || 'gold')}"></div>
+        <div class="x-user-card-body">
+          <div class="x-user-card-top">
+            <span class="avatar x-user-card-avatar">${avatarHtml}</span>
+            <span class="secondary-button x-pill-btn">${isMe ? 'Tu perfil' : 'Ver perfil'}</span>
+          </div>
+          <div class="x-user-card-name">
+            <strong>${escapeHtml(u.name)}</strong>
+            ${u.isAdmin ? '<span class="admin-role-badge">Admin</span>' : ''}
+          </div>
+          <span class="x-handle">${escapeHtml(u.handle)}</span>
+          <p class="x-user-card-bio">${escapeHtml(u.bio || 'Estudiante en Cuaderno.')}</p>
+          <div class="x-user-card-stats">
+            <span><strong>${u.testsCompleted}</strong> ${u.testsCompleted === 1 ? 'test' : 'tests'}</span>
+            ${scoreBadge}
+          </div>
+        </div>
+      </a>`;
+    })
+    .join('');
+
+  const feedHtml = feed
+    .map((item) => {
+      const initial = (item.userName || 'E').charAt(0).toLocaleUpperCase('es');
+      const avatarHtml = item.userAvatar
+        ? `<img class="avatar-img" src="${escapeHtml(item.userAvatar)}" alt="${escapeHtml(item.userName)}" />`
+        : escapeHtml(initial);
+      const pct = Number(item.percentage) || 0;
+      const tier = pct >= 80 ? 'is-high' : pct >= 60 ? 'is-mid' : 'is-low';
+      const isSim = String(item.section || '').toLowerCase().includes('simulacro');
+      const profileHref = myUserId && item.userId === myUserId ? '#perfil' : `#usuario/${encodeURIComponent(item.userId)}`;
+
+      return `<article class="x-feed-item">
+        <a class="x-feed-avatar" href="${profileHref}" title="Ver perfil de ${escapeHtml(item.userName)}">
+          <span class="avatar x-feed-user-avatar">${avatarHtml}</span>
+        </a>
+        <div class="x-feed-body">
+          <div class="x-feed-header">
+            <div class="x-feed-author">
+              <a class="x-author-link" href="${profileHref}"><strong>${escapeHtml(item.userName)}</strong></a>
+              ${item.isAdmin ? '<span class="admin-role-badge">Admin</span>' : ''}
+              <span class="x-feed-handle">${escapeHtml(item.userHandle)}</span>
+              <span class="x-feed-dot">·</span>
+              <span class="x-feed-time">${escapeHtml(formatAttemptDateTime(item.date))}</span>
+            </div>
+            <span class="score-badge ${tier}">${pct}%</span>
+          </div>
+          <p class="x-feed-action-line">
+            Ha completado ${isSim ? 'un <strong>simulacro de examen</strong>' : 'el cuestionario'} en <strong>${escapeHtml(item.subject || 'Cuaderno')}</strong>
+          </p>
+          <div class="x-feed-card">
+            <div class="x-feed-card-left">
+              <span class="test-index">${isSim ? ICONS.clock : ICONS.check}</span>
+              <div>
+                <strong>${escapeHtml(item.section || 'Cuestionario')}</strong>
+                <span>${escapeHtml(String(item.score ?? 0))} de ${escapeHtml(String(item.total ?? 0))} aciertos · ${escapeHtml(item.subject || '')}</span>
+              </div>
+            </div>
+            <a class="secondary-button" href="${profileHref}">Ver perfil ${ICONS.arrow}</a>
+          </div>
+        </div>
+      </article>`;
+    })
+    .join('');
+
+  $('#page-content').innerHTML = `
+    <section class="welcome-row">
+      <div class="welcome-copy">
+        <p class="eyebrow">COMUNIDAD DE ESTUDIANTES</p>
+        <h1>Explorar perfiles<span>.</span></h1>
+        <p>Descubre a tus compañeros de curso, consulta sus estadísticas y entra a ver su perfil completo.</p>
+      </div>
+      <div class="test-actions">
+        <a class="secondary-button" href="#perfil">Ir a mi perfil ${ICONS.arrow}</a>
+      </div>
+    </section>
+
+    <nav class="admin-tabs" aria-label="Vistas de comunidad">
+      <button class="admin-tab ${tab === 'estudiantes' ? 'active' : ''}" type="button" data-comm-tab="estudiantes">
+        ${ICONS.users}
+        <span>Estudiantes</span>
+        <span class="admin-tab-count">${users.length}</span>
+      </button>
+      <button class="admin-tab ${tab === 'actividad' ? 'active' : ''}" type="button" data-comm-tab="actividad">
+        ${ICONS.clock}
+        <span>Actividad en vivo</span>
+        <span class="admin-tab-count">${feed.length}</span>
+      </button>
+    </nav>
+
+    ${
+      loadError
+        ? `<section class="panel section-panel"><div class="admin-empty-state"><p>${escapeHtml(loadError)}</p></div></section>`
+        : tab === 'actividad'
+        ? `<section class="panel x-profile-shell">
+            ${
+              feed.length === 0
+                ? '<div class="admin-empty-state"><p>Todavía no hay actividad reciente registrada en la comunidad.</p></div>'
+                : `<div class="x-feed-list">${feedHtml}</div>`
+            }
+          </section>`
+        : `<section class="panel section-panel">
+            <div class="panel-head admin-panel-head">
+              <div>
+                <h2>Compañeros registrados (${users.length})</h2>
+                <p class="admin-panel-sub">Pulsa sobre cualquier tarjeta para abrir su perfil completo al estilo Twitter / X.</p>
+              </div>
+              <input id="comm-user-search" class="admin-search-input" type="search" placeholder="Buscar por nombre o @usuario..." />
+            </div>
+            ${
+              users.length === 0
+                ? '<div class="admin-empty-state"><p>Todavía no hay estudiantes registrados.</p></div>'
+                : `<div class="x-user-cards-grid" id="comm-users-grid">${userCardsHtml}</div>`
+            }
+          </section>`
+    }
+  `;
+
+  $('#page-content').querySelectorAll('[data-comm-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.commTab;
+      location.hash = next === 'actividad' ? '#comunidad/actividad' : '#comunidad';
+    });
+  });
+
+  $('#comm-user-search')?.addEventListener('input', (event) => {
+    const q = event.target.value.trim().toLowerCase();
+    document.querySelectorAll('#comm-users-grid .x-user-card').forEach((card) => {
+      const hay = card.dataset.search || '';
+      card.hidden = Boolean(q && !hay.includes(q));
+    });
+  });
+}
+
+async function renderPublicProfile(userId, activeTab = 'actividad') {
+  stopExamTimer();
+  if (!userId) return renderCommunity();
+
+  const myUserId = dataService.getUser()?.id || '';
+  if (myUserId && userId === myUserId) {
+    location.hash = '#perfil';
+    return;
+  }
+
+  const tab = activeTab === 'asignaturas' ? 'asignaturas' : 'actividad';
+  setNavigation('community', 'Perfil de estudiante');
+  renderLoading('Cargando perfil del estudiante...');
+
+  try {
+    const [{ profile, scores }, catalog] = await Promise.all([
+      dataService.getPublicUserProfile(userId),
+      dataService.getCatalog()
+    ]);
+
+    const displayName = profile.name || 'Estudiante';
+    setNavigation('community', displayName);
+    const initial = displayName.charAt(0).toLocaleUpperCase('es');
+    const avatarInnerHtml = profile.avatar
+      ? `<img class="avatar-img" src="${escapeHtml(profile.avatar)}" alt="${escapeHtml(displayName)}" />`
+      : escapeHtml(initial);
+    const bio =
+      profile.bio?.trim() ||
+      'Estudiante en Cuaderno · Practicando con tests interactivos y simulacros de examen.';
+    const bannerColor = profile.banner || 'gold';
+
+    let tabContentHtml = '';
+    if (tab === 'asignaturas') {
+      const bySubject = new Map();
+      for (const s of scores || []) {
+        const subName = s.subject || 'General';
+        const cur = bySubject.get(subName) || { count: 0, sum: 0, best: 0 };
+        const pct = Number(s.percentage) || 0;
+        cur.count += 1;
+        cur.sum += pct;
+        if (pct > cur.best) cur.best = pct;
+        bySubject.set(subName, cur);
+      }
+
+      tabContentHtml = catalog
+        .map((sub) => {
+          const stat = bySubject.get(sub.name) || { count: 0, sum: 0, best: 0 };
+          const avg = stat.count ? Math.round(stat.sum / stat.count) : 0;
+          const tier = !stat.count ? 'is-pending' : avg >= 80 ? 'is-high' : avg >= 60 ? 'is-mid' : 'is-low';
+          return `<div class="x-feed-item">
+            <div class="x-feed-avatar">${iconTile(ICONS.folder, sub.color)}</div>
+            <div class="x-feed-body">
+              <div class="x-feed-header">
+                <div>
+                  <strong>${escapeHtml(sub.name)}</strong>
+                  <span class="x-feed-meta"> · ${stat.count} ${stat.count === 1 ? 'test completado' : 'tests completados'}</span>
+                </div>
+                <span class="score-badge ${tier}">${stat.count ? `Media: ${avg}% · Mejor: ${stat.best}%` : 'Sin intentos'}</span>
+              </div>
+              <div class="subject-progress-bar x-progress-bar"><span style="width:${stat.count ? Math.max(4, Math.min(100, avg)) : 0}%"></span></div>
+            </div>
+          </div>`;
+        })
+        .join('');
+    } else {
+      if (!scores || !scores.length) {
+        tabContentHtml = `<div class="admin-empty-state"><p>${escapeHtml(displayName)} todavía no ha completado ningún cuestionario.</p></div>`;
+      } else {
+        tabContentHtml = `<div class="x-feed-list">${scores
+          .map((item) => {
+            const pct = Number(item.percentage) || 0;
+            const tier = pct >= 80 ? 'is-high' : pct >= 60 ? 'is-mid' : 'is-low';
+            const isSim = String(item.section || '').toLowerCase().includes('simulacro');
+            const subObj = catalog.find((s) => s.name === item.subject);
+            return `<article class="x-feed-item">
+              <div class="x-feed-avatar">
+                <span class="avatar x-feed-user-avatar">${avatarInnerHtml}</span>
+              </div>
+              <div class="x-feed-body">
+                <div class="x-feed-header">
+                  <div class="x-feed-author">
+                    <strong>${escapeHtml(displayName)}</strong>
+                    <span class="x-feed-handle">${escapeHtml(profile.handle)}</span>
+                    <span class="x-feed-dot">·</span>
+                    <span class="x-feed-time">${escapeHtml(formatAttemptDateTime(item.date))}</span>
+                  </div>
+                  <span class="score-badge ${tier}">${pct}%</span>
+                </div>
+                <p class="x-feed-action-line">
+                  Ha completado ${isSim ? 'un <strong>simulacro de examen</strong>' : 'el cuestionario'} en <strong>${escapeHtml(item.subject || 'Cuaderno')}</strong>
+                </p>
+                <div class="x-feed-card">
+                  <div class="x-feed-card-left">
+                    <span class="test-index">${isSim ? ICONS.clock : ICONS.check}</span>
+                    <div>
+                      <strong>${escapeHtml(item.section || 'Cuestionario')}</strong>
+                      <span>${escapeHtml(String(item.score ?? 0))} de ${escapeHtml(String(item.total ?? 0))} aciertos · ${escapeHtml(item.subject || '')}</span>
+                    </div>
+                  </div>
+                  ${subObj ? `<a class="secondary-button" href="#asignatura/${encodeURIComponent(subObj.id)}">Ir al tema ${ICONS.arrow}</a>` : ''}
+                </div>
+              </div>
+            </article>`;
+          })
+          .join('')}</div>`;
+      }
+    }
+
+    $('#page-content').innerHTML = `
+      <section class="panel x-profile-shell">
+        <header class="x-profile-StickyHead">
+          <a class="x-back-circle" href="#comunidad" title="Volver a Comunidad" aria-label="Volver a Comunidad">←</a>
+          <div>
+            <div class="x-head-title-row">
+              <h2>${escapeHtml(displayName)}</h2>
+              ${profile.isAdmin ? '<span class="admin-role-badge">Admin</span>' : ''}
+            </div>
+            <span>${profile.testsCompleted} ${profile.testsCompleted === 1 ? 'test completado' : 'tests completados'} · ${profile.totalQuestions} preguntas respondidas</span>
+          </div>
+        </header>
+
+        <div class="x-banner" data-banner="${escapeHtml(bannerColor)}"></div>
+
+        <div class="x-profile-main">
+          <div class="x-avatar-bar">
+            <span class="avatar x-profile-avatar" style="cursor:default">
+              ${avatarInnerHtml}
+            </span>
+            <div class="x-profile-actions">
+              <a class="secondary-button x-edit-btn" href="#comunidad">${ICONS.users} Ver todos</a>
+            </div>
+          </div>
+
+          <div class="x-identity-block">
+            <div class="x-name-line">
+              <h1>${escapeHtml(displayName)}</h1>
+              ${profile.isAdmin ? `<span class="x-verified-badge" title="Administrador verificado">${ICONS.shield} Admin</span>` : ''}
+            </div>
+            <p class="x-handle">${escapeHtml(profile.handle)}</p>
+            <p class="x-bio">${escapeHtml(bio)}</p>
+
+            <div class="x-meta-items">
+              <span>Miembro desde ${escapeHtml(formatShortDate(profile.createdAt))}</span>
+            </div>
+
+            <div class="x-follow-stats">
+              <span class="x-stat-pill"><strong>${profile.testsCompleted}</strong> <span>Tests</span></span>
+              <span class="x-stat-pill"><strong>${profile.averageScore !== null ? `${profile.averageScore}%` : '—'}</strong> <span>Nota media</span></span>
+              <span class="x-stat-pill"><strong>${profile.totalQuestions ? `${profile.totalCorrect}/${profile.totalQuestions}` : '0'}</strong> <span>Aciertos</span></span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="x-tabs x-tabs-2" aria-label="Secciones del perfil de ${escapeHtml(displayName)}">
+          <button type="button" class="x-tab ${tab === 'actividad' ? 'active' : ''}" data-pub-tab="actividad">
+            <span>Actividad</span>
+          </button>
+          <button type="button" class="x-tab ${tab === 'asignaturas' ? 'active' : ''}" data-pub-tab="asignaturas">
+            <span>Asignaturas</span>
+          </button>
+        </nav>
+
+        <div class="x-tab-panel">
+          ${tabContentHtml}
+        </div>
+      </section>
+    `;
+
+    $('#page-content').querySelectorAll('[data-pub-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = btn.dataset.pubTab;
+        location.hash = next === 'asignaturas' ? `#usuario/${encodeURIComponent(userId)}/asignaturas` : `#usuario/${encodeURIComponent(userId)}`;
+      });
+    });
+  } catch (err) {
+    $('#page-content').innerHTML = `<section class="panel result-card"><h2>No se pudo cargar este perfil</h2><p>${escapeHtml(err.message || 'El estudiante no existe o no está disponible.')}</p><div class="result-buttons"><a class="primary-button" href="#comunidad">Volver a Comunidad</a></div></section>`;
+  }
+}
+
 async function renderRoute() {
   await renderSidebar();
   const parts = decodeURI(location.hash.slice(1)).split('/');
@@ -1454,6 +1805,8 @@ async function renderRoute() {
   if (parts[0] === 'tests') return renderTests(parts[1]);
   if (parts[0] === 'test') return startQuiz(parts[1], parts[2], parts[3]);
   if (parts[0] === 'repaso') return startReview(parts[1] || '');
+  if (parts[0] === 'comunidad') return renderCommunity(parts[1] || 'estudiantes');
+  if (parts[0] === 'usuario') return renderPublicProfile(parts[1], parts[2] || 'actividad');
   if (parts[0] === 'perfil') return renderProfile(parts[1] || 'actividad');
   if (parts[0] === 'admin') return renderAdmin(parts[1] || 'usuarios');
   return renderHome();
@@ -1462,6 +1815,7 @@ async function renderRoute() {
 $('#nav-home').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#inicio'; });
 $('#nav-subjects').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#asignaturas'; });
 $('#nav-tests').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#tests'; });
+$('#nav-community')?.addEventListener('click', (event) => { event.preventDefault(); location.hash = '#comunidad'; });
 $('#nav-profile')?.addEventListener('click', (event) => { event.preventDefault(); location.hash = '#perfil'; });
 $('#nav-admin')?.addEventListener('click', (event) => { event.preventDefault(); location.hash = '#admin'; });
 window.addEventListener('hashchange', renderRoute);

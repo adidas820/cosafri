@@ -1150,6 +1150,46 @@ export const dataService = {
   },
 
   /**
+   * Obtiene el directorio público de estudiantes y el feed de actividad reciente de la comunidad.
+   */
+  async getCommunityData() {
+    const resp = await fetch('/.netlify/functions/admin?action=community', {
+      headers: { 'Accept': 'application/json' }
+    });
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('El directorio de comunidad requiere estar conectado en Netlify (o netlify dev).');
+    }
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data?.error || `Error al cargar la comunidad (${resp.status}).`);
+    }
+    return {
+      users: Array.isArray(data?.users) ? data.users : [],
+      feed: Array.isArray(data?.feed) ? data.feed : []
+    };
+  },
+
+  /**
+   * Obtiene el perfil público y el historial reciente de un estudiante concreto (#usuario/<id>).
+   */
+  async getPublicUserProfile(userId) {
+    const resp = await fetch(
+      `/.netlify/functions/admin?action=public-profile&userId=${encodeURIComponent(userId)}`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('La vista de perfiles públicos requiere estar conectado en Netlify (o netlify dev).');
+    }
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data?.error || `No se pudo cargar el perfil (${resp.status}).`);
+    }
+    return data;
+  },
+
+  /**
    * Crea una nueva asignatura en Supabase desde el panel de administración.
    */
   async createSubject({ id = '', name, description = '', color = 'violet' }) {
