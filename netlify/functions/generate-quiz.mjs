@@ -34,11 +34,67 @@ export const handler = async (event) => {
     'Content-Type': 'application/json; charset=utf-8'
   };
 
+  if (event.httpMethod === 'DELETE') {
+    try {
+      const body = JSON.parse(event.body || '{}');
+      const { subjectId, topicId, sectionId } = body;
+      if (!subjectId || !topicId || !sectionId || !String(sectionId).startsWith('ia-')) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Solo se pueden eliminar tests generados con IA (ia-...).' })
+        };
+      }
+      const supabaseUrl = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '');
+      const supabaseKey = (
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_SERVICE_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        ''
+      ).trim();
+      if (!supabaseUrl || !supabaseKey) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'Supabase no está configurado en el servidor.' })
+        };
+      }
+      const delUrl = `${supabaseUrl}/rest/v1/sections?subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&id=eq.${encodeURIComponent(sectionId)}`;
+      const delResp = await fetch(delUrl, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Prefer': 'return=minimal'
+        }
+      });
+      if (!delResp.ok) {
+        const errText = await delResp.text().catch(() => '');
+        return {
+          statusCode: delResp.status,
+          headers,
+          body: JSON.stringify({ error: `Error al borrar de Supabase (${delResp.status}): ${errText}` })
+        };
+      }
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ deleted: true })
+      };
+    } catch (err) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: err.message || 'Error al eliminar el test.' })
+      };
+    }
+  }
+
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Método no permitido. Usa POST.' })
+      body: JSON.stringify({ error: 'Método no permitido. Usa POST o DELETE.' })
     };
   }
 

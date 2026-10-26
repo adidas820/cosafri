@@ -93,3 +93,17 @@
 .account-form input:focus{border-color:var(--accent)}
 :root[data-theme="light"] .account-form input{background:#ffffff}
 @media(max-width:760px){.review-banner{flex-direction:column;align-items:flex-start}.account-form,.account-actions,.account-password-row{flex-direction:column}}
+
+/* Score Badges & Delete AI Quiz Button */
+.test-head-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.topic-actions,.test-actions{align-items:center}
+.score-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font:700 9px var(--display);letter-spacing:.2px;border:1px solid var(--line);white-space:nowrap}
+.score-badge.is-high{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 55%,var(--line));color:var(--green)}
+.score-badge.is-mid{background:color-mix(in srgb,var(--amber) 18%,var(--panel));border-color:color-mix(in srgb,var(--amber) 55%,var(--line));color:var(--amber)}
+.score-badge.is-low{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 55%,var(--line));color:var(--red)}
+.score-badge.is-pending{background:var(--panel-2);border-color:var(--line);color:var(--muted);font-weight:600}
+:root[data-theme="light"] .score-badge.is-mid{background:#fef3c7;border-color:#f59e0b;color:#b45309}
+.icon-danger-button{border:1px solid var(--line);border-radius:6px;background:var(--panel-2);color:var(--muted);width:30px;height:30px;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background .15s,border-color .15s,color .15s;flex:none}
+.icon-danger-button svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-danger-button:hover:not(:disabled){background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.icon-danger-button:disabled{opacity:.5;cursor:not-allowed}

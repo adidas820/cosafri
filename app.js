@@ -12,6 +12,7 @@ const ICONS = {
   file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6m-6 4h6"/></svg>',
   clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14ZM10 11v6M14 11v6"/></svg>'
 };
 
 let activeQuiz = null;
@@ -90,6 +91,46 @@ function bindGenerateButtons() {
       }
     });
   });
+  $('#page-content').querySelectorAll('[data-delete-section]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const sectionId = btn.dataset.deleteSection;
+      const subjectId = btn.dataset.subject;
+      const topicId = btn.dataset.topic;
+      const name = btn.dataset.name || sectionId;
+      if (!confirm(`¿Seguro que quieres eliminar el test "${name}" de Supabase? Esta acción no se puede deshacer.`)) {
+        return;
+      }
+      btn.disabled = true;
+      try {
+        await dataService.deleteSection(subjectId, topicId, sectionId);
+        showToast(`Test "${name}" eliminado.`);
+        renderRoute();
+      } catch (err) {
+        btn.disabled = false;
+        showToast(err.message || 'No se pudo eliminar el test.', 5000);
+      }
+    });
+  });
+}
+
+function sectionScoreBadge(subjectName, sectionName, scores = dataService.readScores()) {
+  const matches = scores.filter(
+    (s) => s.section === sectionName && (!s.subject || s.subject === subjectName)
+  );
+  if (!matches.length) {
+    return '<span class="score-badge is-pending" title="Aún no has completado este test">Pendiente</span>';
+  }
+  const best = Math.max(...matches.map((m) => Number(m.percentage) || 0));
+  const last = Number(matches[0].percentage) || 0;
+  const tier = best >= 80 ? 'is-high' : best >= 60 ? 'is-mid' : 'is-low';
+  const label = best === last ? `Mejor: ${best}%` : `Mejor: ${best}% · Últ.: ${last}%`;
+  const title = `Mejor nota: ${best}% · Última nota: ${last}% (${matches.length} ${matches.length === 1 ? 'intento' : 'intentos'})`;
+  return `<span class="score-badge ${tier}" title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
+}
+
+function deleteAiTestButton(subjectId, topicId, section) {
+  if (!String(section?.id || '').startsWith('ia-')) return '';
+  return `<button class="icon-danger-button" type="button" data-delete-section="${escapeHtml(section.id)}" data-subject="${escapeHtml(subjectId)}" data-topic="${escapeHtml(topicId)}" data-name="${escapeHtml(section.name)}" title="Eliminar este test generado con IA" aria-label="Eliminar test ${escapeHtml(section.name)}">${ICONS.trash}</button>`;
 }
 
 function subjectCard(subject) {
@@ -114,9 +155,9 @@ async function renderHome() {
   bindGenerateButtons();
 }
 
-function topicAccordion(subject, topic, index) {
+function topicAccordion(subject, topic, index, scores = dataService.readScores()) {
   const qCount = topic.sections.reduce((sum, section) => sum + (section.questionCount || section.questions?.length || 0), 0);
-  return `<details class="subject-accordion"><summary><span class="summary-left"><span class="topic-number">${String(index + 1).padStart(2, '0')}</span><span class="summary-title"><strong>${escapeHtml(topic.name)}</strong><span>${topic.pages} páginas · ${topic.sections.length} tests · ${qCount} preguntas</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list"><div class="topic-row"><a class="topic-copy" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}"><span class="topic-file-icon">${ICONS.file}</span><span><strong>Leer el temario</strong><span>Abre el PDF original dentro de la página</span></span></a><span class="topic-actions"><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Generar test con IA</button><a class="secondary-button" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">Abrir PDF ${ICONS.arrow}</a></span></div>${topic.sections.map((section, sectionIndex) => `<div class="topic-row"><span class="topic-copy"><span class="topic-number small-number">${sectionIndex + 1}</span><span><strong>${escapeHtml(section.name)}</strong><span>${escapeHtml(section.description)} · ${section.questionCount || section.questions?.length || 0} preguntas</span></span></span><span class="topic-actions"><a class="secondary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></span></div>`).join('')}</div></details>`;
+  return `<details class="subject-accordion"><summary><span class="summary-left"><span class="topic-number">${String(index + 1).padStart(2, '0')}</span><span class="summary-title"><strong>${escapeHtml(topic.name)}</strong><span>${topic.pages} páginas · ${topic.sections.length} tests · ${qCount} preguntas</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list"><div class="topic-row"><a class="topic-copy" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}"><span class="topic-file-icon">${ICONS.file}</span><span><strong>Leer el temario</strong><span>Abre el PDF original dentro de la página</span></span></a><span class="topic-actions"><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Generar test con IA</button><a class="secondary-button" href="#temario/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}">Abrir PDF ${ICONS.arrow}</a></span></div>${topic.sections.map((section, sectionIndex) => `<div class="topic-row"><span class="topic-copy"><span class="topic-number small-number">${sectionIndex + 1}</span><span><strong>${escapeHtml(section.name)}</strong><span>${escapeHtml(section.description)} · ${section.questionCount || section.questions?.length || 0} preguntas</span></span></span><span class="topic-actions">${sectionScoreBadge(subject.name, section.name, scores)}${deleteAiTestButton(subject.id, topic.id, section)}<a class="secondary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></span></div>`).join('')}</div></details>`;
 }
 
 async function renderSubjects() {
@@ -124,7 +165,8 @@ async function renderSubjects() {
   setNavigation('subjects');
   renderLoading('Cargando asignaturas...');
   const catalog = await dataService.getCatalog();
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TODO TU MATERIAL, EN SU SITIO</p><h1>Asignaturas</h1><p>Despliega una asignatura para ver sus temarios, abrir el PDF o generar nuevos tests con IA.</p></div><button class="primary-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button></section><div class="subject-list-accordion">${catalog.map((subject) => `<details class="subject-accordion" open><summary><span class="summary-left">${iconTile(ICONS.folder, subject.color)}<span class="summary-title"><strong>${escapeHtml(subject.name)}</strong><span>${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index)).join('')}</div></details>`).join('')}</div>`;
+  const scores = dataService.readScores();
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">TODO TU MATERIAL, EN SU SITIO</p><h1>Asignaturas</h1><p>Despliega una asignatura para ver sus temarios, abrir el PDF o generar nuevos tests con IA.</p></div><button class="primary-button" type="button" data-open-gen-quiz>${ICONS.sparkle} Generar test con IA</button></section><div class="subject-list-accordion">${catalog.map((subject) => `<details class="subject-accordion" open><summary><span class="summary-left">${iconTile(ICONS.folder, subject.color)}<span class="summary-title"><strong>${escapeHtml(subject.name)}</strong><span>${subject.topics.length} ${subject.topics.length === 1 ? 'temario' : 'temarios'} · ${escapeHtml(subject.description)}</span></span></span><span class="chevron">${ICONS.chevron}</span></summary><div class="topic-list">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index, scores)).join('')}</div></details>`).join('')}</div>`;
   bindGenerateButtons();
 }
 
@@ -133,8 +175,9 @@ async function renderSubject(subjectId) {
   renderLoading('Cargando asignatura...');
   const subject = await dataService.getSubject(subjectId);
   if (!subject) return renderSubjects();
+  const scores = dataService.readScores();
   setNavigation('subjects', subject.name);
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">ASIGNATURA</p><h1>${escapeHtml(subject.name)}</h1><p>${escapeHtml(subject.description)}</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Generar test con IA</button></section><div class="subject-list-accordion">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index)).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">ASIGNATURA</p><h1>${escapeHtml(subject.name)}</h1><p>${escapeHtml(subject.description)}</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}">${ICONS.sparkle} Generar test con IA</button></section><div class="subject-list-accordion">${subject.topics.map((topic, index) => topicAccordion(subject, topic, index, scores)).join('')}</div>`;
   bindGenerateButtons();
 }
 
@@ -143,10 +186,11 @@ async function renderTests(subjectId) {
   setNavigation('tests');
   renderLoading('Cargando cuestionarios...');
   const catalog = await dataService.getCatalog();
+  const scores = dataService.readScores();
   const selectedSubject = subjectId ? catalog.find((s) => s.id === subjectId) : null;
   const mistakes = await dataService.getMistakes().catch(() => []);
   const groups = catalog.filter((subject) => !selectedSubject || subject.id === selectedSubject.id).flatMap((subject) => subject.topics.flatMap((topic) => topic.sections.map((section) => ({ subject, topic, section }))));
-  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">PRACTICA CON PREGUNTAS DEL TEMARIO</p><h1>Tests</h1><p>Cuestionarios redactados a partir de tus apuntes o generados a medida con Gemini AI y sincronizados en Supabase.</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.sparkle} Generar nuevo test con IA</button></section>${reviewBanner(mistakes, selectedSubject?.id || '')}<div class="page-heading-actions"><label class="subject-filter"><span>Asignatura</span><select id="test-subject-filter"><option value="">Todas las asignaturas</option>${catalog.map((subject) => `<option value="${escapeHtml(subject.id)}" ${selectedSubject?.id === subject.id ? 'selected' : ''}>${escapeHtml(subject.name)}</option>`).join('')}</select></label></div><div class="test-groups">${groups.map(({ subject, topic, section }, index) => `<section class="panel test-group"><div class="test-group-head"><div><h2>${escapeHtml(section.name)}</h2><p>${escapeHtml(subject.name)} · ${escapeHtml(topic.name)} · ${escapeHtml(section.description)}</p></div><span class="test-count">${section.questionCount || section.questions?.length || 0} preguntas</span></div><div class="test-list"><div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>Test: ${escapeHtml(section.name)}</strong><span>Selección múltiple · respuesta y explicación al momento</span></div><a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div></section>`).join('')}</div>`;
+  $('#page-content').innerHTML = `<section class="welcome-row"><div class="welcome-copy"><p class="eyebrow">PRACTICA CON PREGUNTAS DEL TEMARIO</p><h1>Tests</h1><p>Cuestionarios redactados a partir de tus apuntes o generados a medida con Gemini AI y sincronizados en Supabase.</p></div><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(selectedSubject?.id || '')}">${ICONS.sparkle} Generar nuevo test con IA</button></section>${reviewBanner(mistakes, selectedSubject?.id || '')}<div class="page-heading-actions"><label class="subject-filter"><span>Asignatura</span><select id="test-subject-filter"><option value="">Todas las asignaturas</option>${catalog.map((subject) => `<option value="${escapeHtml(subject.id)}" ${selectedSubject?.id === subject.id ? 'selected' : ''}>${escapeHtml(subject.name)}</option>`).join('')}</select></label></div><div class="test-groups">${groups.map(({ subject, topic, section }, index) => `<section class="panel test-group"><div class="test-group-head"><div><h2>${escapeHtml(section.name)}</h2><p>${escapeHtml(subject.name)} · ${escapeHtml(topic.name)} · ${escapeHtml(section.description)}</p></div><div class="test-head-meta">${sectionScoreBadge(subject.name, section.name, scores)}<span class="test-count">${section.questionCount || section.questions?.length || 0} preguntas</span></div></div><div class="test-list"><div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>Test: ${escapeHtml(section.name)}</strong><span>Selección múltiple · respuesta y explicación al momento</span></div><div class="test-actions">${deleteAiTestButton(subject.id, topic.id, section)}<a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div></div></section>`).join('')}</div>`;
   $('#test-subject-filter')?.addEventListener('change', (event) => {
     const next = event.target.value;
     location.hash = next ? `#tests/${encodeURIComponent(next)}` : '#tests';
@@ -159,9 +203,10 @@ async function renderTopic(subjectId, topicId) {
   renderLoading('Cargando temario...');
   const { subject, topic } = await dataService.getTopic(subjectId, topicId);
   if (!subject || !topic) return renderSubjects();
+  const scores = dataService.readScores();
   setNavigation('subjects', topic.name);
   const qCount = topic.sections.reduce((sum, section) => sum + (section.questionCount || section.questions?.length || 0), 0);
-  $('#page-content').innerHTML = `<section class="topic-page-head"><div><p class="eyebrow">${escapeHtml(subject.name)}</p><h1>${escapeHtml(topic.name)}</h1><p>${topic.pages} páginas · ${topic.sections.length} cuestionarios relacionados</p></div><div class="test-actions"><a class="secondary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Volver a la asignatura</a><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Generar test con IA</button></div></section><section class="panel pdf-panel"><div class="pdf-toolbar"><strong>${escapeHtml(topic.name)}</strong><a class="text-link" href="${escapeHtml(topic.file)}" target="_blank" rel="noreferrer">Abrir PDF en otra pestaña ${ICONS.arrow}</a></div><iframe class="pdf-frame" src="${escapeHtml(topic.file)}#toolbar=1&navpanes=0" title="${escapeHtml(topic.name)}" loading="lazy"><p class="pdf-fallback">No se pudo mostrar el PDF. <a href="${escapeHtml(topic.file)}">Ábrelo aquí</a>.</p></iframe></section><section class="panel section-panel"><div class="panel-head"><h2>Practicar este temario</h2><div class="test-actions"><span class="test-count">${topic.sections.length} tests · ${qCount} preguntas</span><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Nuevo test IA</button></div></div><div class="test-list">${topic.sections.map((section, index) => `<div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>${escapeHtml(section.name)}</strong><span>${escapeHtml(section.description)} · ${section.questionCount || section.questions?.length || 0} preguntas</span></div><a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div>`).join('')}</div></section>`;
+  $('#page-content').innerHTML = `<section class="topic-page-head"><div><p class="eyebrow">${escapeHtml(subject.name)}</p><h1>${escapeHtml(topic.name)}</h1><p>${topic.pages} páginas · ${topic.sections.length} cuestionarios relacionados</p></div><div class="test-actions"><a class="secondary-button" href="#asignatura/${encodeURIComponent(subject.id)}">Volver a la asignatura</a><button class="primary-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Generar test con IA</button></div></section><section class="panel pdf-panel"><div class="pdf-toolbar"><strong>${escapeHtml(topic.name)}</strong><a class="text-link" href="${escapeHtml(topic.file)}" target="_blank" rel="noreferrer">Abrir PDF en otra pestaña ${ICONS.arrow}</a></div><iframe class="pdf-frame" src="${escapeHtml(topic.file)}#toolbar=1&navpanes=0" title="${escapeHtml(topic.name)}" loading="lazy"><p class="pdf-fallback">No se pudo mostrar el PDF. <a href="${escapeHtml(topic.file)}">Ábrelo aquí</a>.</p></iframe></section><section class="panel section-panel"><div class="panel-head"><h2>Practicar este temario</h2><div class="test-actions"><span class="test-count">${topic.sections.length} tests · ${qCount} preguntas</span><button class="secondary-button ai-accent-button" type="button" data-open-gen-quiz data-subject="${escapeHtml(subject.id)}" data-topic="${escapeHtml(topic.id)}">${ICONS.sparkle} Nuevo test IA</button></div></div><div class="test-list">${topic.sections.map((section, index) => `<div class="test-row"><span class="test-index">${String(index + 1).padStart(2, '0')}</span><div class="test-row-copy"><strong>${escapeHtml(section.name)}</strong><span>${escapeHtml(section.description)} · ${section.questionCount || section.questions?.length || 0} preguntas</span></div><div class="test-actions">${sectionScoreBadge(subject.name, section.name, scores)}${deleteAiTestButton(subject.id, topic.id, section)}<a class="primary-button" href="#test/${encodeURIComponent(subject.id)}/${encodeURIComponent(topic.id)}/${encodeURIComponent(section.id)}">Empezar test ${ICONS.arrow}</a></div></div>`).join('')}</div></section>`;
   bindGenerateButtons();
 }
 

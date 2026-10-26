@@ -662,6 +662,86 @@ export const dataService = {
   },
 
   /**
+   * Elimina un cuestionario generado con IA (`ia-...`) de Supabase y de la caché local.
+   */
+  async deleteSection(subjectId, topicId, sectionId) {
+    if (!subjectId || !topicId || !sectionId || !String(sectionId).startsWith('ia-')) {
+      throw new Error('Solo se pueden eliminar los tests generados con IA.');
+    }
+
+    // 1. Eliminar del almacenamiento local de respaldo si existiera
+    try {
+      const store = readLocalGeneratedSections();
+      const key = `${subjectId}/${topicId}`;
+      if (Array.isArray(store[key])) {
+        store[key] = store[key].filter((s) => s.id !== sectionId);
+        if (store[key].length === 0) {
+          delete store[key];
+        }
+        if (Object.keys(store).length === 0) {
+          localStorage.removeItem(GENERATED_SECTIONS_KEY);
+        } else {
+          localStorage.setItem(GENERATED_SECTIONS_KEY, JSON.stringify(store));
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    // 2. Eliminar de Supabase (primero vía Netlify Function con service_role, y fallback directo por REST)
+    let deletedRemotely = false;
+    try {
+      const fnResp = await fetch('/.netlify/functions/generate-quiz', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subjectId, topicId, sectionId })
+      });
+      if (fnResp.ok) {
+        deletedRemotely = true;
+      } else if (fnResp.status !== 404 && fnResp.status !== 405 && fnResp.status !== 501) {
+        const errData = await fnResp.json().catch(() => ({}));
+        if (errData?.error) throw new Error(errData.error);
+      }
+    } catch (fnErr) {
+      if (fnErr.message && !fnErr.message.includes('Failed to fetch') && !fnErr.message.includes('NetworkError')) {
+        console.warn('Error en función de borrado, intentando vía cliente REST:', fnErr);
+      }
+    }
+
+    if (!deletedRemotely && SUPABASE_CONFIG.enabled && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+      await supabaseFetch(
+        'sections',
+        `subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&id=eq.${encodeURIComponent(sectionId)}`,
+        {
+          method: 'DELETE',
+          headers: { Prefer: 'return=minimal' }
+        }
+      );
+    }
+
+    // 3. Limpiar cachés en memoria
+    const cacheKey = `${subjectId}/${topicId}`;
+    if (catalogCache) {
+      const sub = catalogCache.find((s) => s.id === subjectId);
+      const top = sub?.topics?.find((t) => t.id === topicId);
+      if (top && Array.isArray(top.sections)) {
+        top.sections = top.sections.filter((sec) => sec.id !== sectionId);
+      }
+    }
+    if (topicDetailsCache.has(cacheKey)) {
+      const details = topicDetailsCache.get(cacheKey);
+      if (details && Array.isArray(details.sections)) {
+        details.sections = details.sections.filter((sec) => sec.id !== sectionId);
+      }
+    }
+    if (mistakesCache) {
+      mistakesCache = mistakesCache.filter(
+        (m) => !(m.subjectId === subjectId && m.topicId === topicId && m.sectionId === sectionId)
+      );
+    }
+  },
+
+  /**
    * Genera un nuevo test sobre el tema seleccionado usando Gemini API (`gemini-3.8-flash`)
    * y lo sube a la base de datos en Supabase.
    */
