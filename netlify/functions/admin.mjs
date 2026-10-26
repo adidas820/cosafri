@@ -45,11 +45,12 @@ async function ensurePublicBucket(supabaseUrl, supabaseServiceKey) {
   }).catch(() => {});
 }
 
-async function verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey) {
+async function verifyAuthenticatedUser(event, supabaseUrl, anonKey, parsedBody = null) {
   const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
-  const userToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const headerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const userToken = headerToken || String(parsedBody?.userToken || '').trim();
   if (!userToken) {
-    return { ok: false, status: 401, error: 'Debes iniciar sesión para acceder al panel de administración.' };
+    return { ok: false, status: 401, error: 'Debes iniciar sesión para realizar esta operación.' };
   }
 
   const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
@@ -59,10 +60,20 @@ async function verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey) 
     }
   });
   if (!userResp.ok) {
-    return { ok: false, status: 401, error: 'Sesión inválida o expirada.' };
+    return { ok: false, status: 401, error: 'Sesión inválida o expirada. Cierra sesión y vuelve a entrar.' };
   }
 
   const authUser = await userResp.json();
+  return { ok: true, user: authUser, token: userToken };
+}
+
+async function verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey, parsedBody = null) {
+  const authResult = await verifyAuthenticatedUser(event, supabaseUrl, anonKey, parsedBody);
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  const authUser = authResult.user;
   const adminEmailEnv = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const userEmail = String(authUser?.email || '').trim().toLowerCase();
 
@@ -96,6 +107,32 @@ async function verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey) 
   return { ok: true, user: authUser };
 }
 
+async function storeUserAvatarInBucket(supabaseUrl, supabaseServiceKey, userId, avatarDataUrl) {
+  await ensurePublicBucket(supabaseUrl, supabaseServiceKey);
+  const commaIdx = avatarDataUrl.indexOf(',');
+  const base64Part = commaIdx >= 0 ? avatarDataUrl.slice(commaIdx + 1) : avatarDataUrl;
+  const binaryBuffer = Buffer.from(base64Part, 'base64');
+  const storagePath = `avatars/${userId}.jpg`;
+
+  const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/${STORAGE_BUCKET}/${storagePath}`, {
+    method: 'POST',
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true'
+    },
+    body: binaryBuffer
+  });
+
+  if (!uploadResp.ok) {
+    const errText = await uploadResp.text().catch(() => '');
+    throw new Error(`No se pudo subir el avatar a Supabase Storage (${uploadResp.status}): ${errText}`);
+  }
+
+  return `${supabaseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}?v=${Date.now()}`;
+}
+
 export const handler = async (event) => {
   const headers = {
     'Content-Type': 'application/json; charset=utf-8'
@@ -119,7 +156,81 @@ export const handler = async (event) => {
     };
   }
 
-  const authCheck = await verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey);
+  let parsedBody = {};
+  if (event.body) {
+    try {
+      parsedBody = JSON.parse(event.body);
+    } catch {
+      parsedBody = {};
+    }
+  }
+
+  const action = event.queryStringParameters?.action || 'users';
+  const sbHeaders = {
+    'apikey': supabaseServiceKey,
+    'Authorization': `Bearer ${supabaseServiceKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  // Acción permitida para cualquier usuario con sesión iniciada: guardar/quitar su foto de perfil en Storage
+  if (event.httpMethod === 'POST' && action === 'upload-avatar') {
+    const userAuth = await verifyAuthenticatedUser(event, supabaseUrl, anonKey, parsedBody);
+    if (!userAuth.ok) {
+      return {
+        statusCode: userAuth.status,
+        headers,
+        body: JSON.stringify({ error: userAuth.error })
+      };
+    }
+
+    try {
+      const userId = userAuth.user.id;
+      const rawAvatar = String(parsedBody.avatarDataUrl ?? '').trim();
+      const cleanName =
+        parsedBody.name !== undefined
+          ? String(parsedBody.name || '').trim()
+          : userAuth.user.user_metadata?.name || '';
+
+      let finalAvatarUrl = '';
+      if (rawAvatar.startsWith('data:image/')) {
+        finalAvatarUrl = await storeUserAvatarInBucket(supabaseUrl, supabaseServiceKey, userId, rawAvatar);
+      } else if (rawAvatar.startsWith('http://') || rawAvatar.startsWith('https://')) {
+        finalAvatarUrl = rawAvatar;
+      } else {
+        // Si el usuario quita su foto, borramos el archivo del bucket para no dejar basura
+        await fetch(`${supabaseUrl}/storage/v1/object/${STORAGE_BUCKET}/avatars/${encodeURIComponent(userId)}.jpg`, {
+          method: 'DELETE',
+          headers: sbHeaders
+        }).catch(() => {});
+      }
+
+      await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'PUT',
+        headers: sbHeaders,
+        body: JSON.stringify({
+          user_metadata: {
+            ...(userAuth.user.user_metadata || {}),
+            name: cleanName,
+            avatar_url: finalAvatarUrl
+          }
+        })
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ok: true, avatarUrl: finalAvatarUrl })
+      };
+    } catch (err) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: err.message || 'No se pudo actualizar la foto de perfil.' })
+      };
+    }
+  }
+
+  const authCheck = await verifyAdminUser(event, supabaseUrl, supabaseServiceKey, anonKey, parsedBody);
   if (!authCheck.ok) {
     return {
       statusCode: authCheck.status,
@@ -128,16 +239,9 @@ export const handler = async (event) => {
     };
   }
 
-  const sbHeaders = {
-    'apikey': supabaseServiceKey,
-    'Authorization': `Bearer ${supabaseServiceKey}`,
-    'Content-Type': 'application/json'
-  };
-
   try {
-    const action = event.queryStringParameters?.action || 'users';
 
-    if (event.httpMethod === 'GET' && action === 'users') {
+    if ((event.httpMethod === 'GET' || event.httpMethod === 'POST') && action === 'users') {
       const [authUsersResp, profilesResp, scoresResp, mistakesResp] = await Promise.all([
         fetch(`${supabaseUrl}/auth/v1/admin/users?page=1&per_page=200`, { headers: sbHeaders }),
         fetch(`${supabaseUrl}/rest/v1/student_profiles?select=id,name,is_admin,updated_at`, { headers: sbHeaders }).catch(() => null),
@@ -178,6 +282,31 @@ export const handler = async (event) => {
 
       const adminEmailEnv = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 
+      // Si algún usuario tenía aún un avatar en Base64 dentro de user_metadata, migrarlo a Storage
+      await Promise.all(
+        rawUsers.map(async (u) => {
+          const currentAvatar = u.user_metadata?.avatar_url || '';
+          if (currentAvatar.startsWith('data:image/')) {
+            try {
+              const publicUrl = await storeUserAvatarInBucket(supabaseUrl, supabaseServiceKey, u.id, currentAvatar);
+              u.user_metadata.avatar_url = publicUrl;
+              await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, {
+                method: 'PUT',
+                headers: sbHeaders,
+                body: JSON.stringify({
+                  user_metadata: {
+                    ...(u.user_metadata || {}),
+                    avatar_url: publicUrl
+                  }
+                })
+              });
+            } catch {
+              // continuar con el resto
+            }
+          }
+        })
+      );
+
       const users = rawUsers
         .map((u) => {
           const prof = profileMap.get(u.id);
@@ -211,7 +340,7 @@ export const handler = async (event) => {
       };
     }
 
-    const body = event.body ? JSON.parse(event.body) : {};
+    const body = parsedBody;
 
     if (event.httpMethod === 'POST' && action === 'create-subject') {
       const name = String(body.name || '').trim();

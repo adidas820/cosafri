@@ -122,35 +122,93 @@ async function authFetch(path, { method = 'GET', body, token } = {}) {
 }
 
 /**
- * Devuelve un access token válido (renovándolo si está a punto de caducar) o null si no hay sesión.
+ * Sube un avatar en Base64 al bucket público de Supabase Storage vía Netlify Function
+ * para obtener una URL corta (~90 bytes) y no inflar jamás el JWT de Supabase Auth.
  */
-async function getValidAccessToken() {
+async function uploadAvatarToStorage(token, name, avatarDataUrl) {
+  const sendInHeader = token && token.length < 3500;
+  const resp = await fetch('/.netlify/functions/admin?action=upload-avatar', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...(sendInHeader ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({
+      name,
+      avatarDataUrl,
+      ...(sendInHeader ? {} : { userToken: token })
+    })
+  });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) {
+    throw new Error(data?.error || `Error al subir avatar (${resp.status})`);
+  }
+  return data?.avatarUrl || '';
+}
+
+/**
+ * Devuelve un access token válido (renovándolo si está a punto de caducar o si se fuerza)
+ * y repara automáticamente cualquier JWT que se haya inflado por tener un avatar Base64 en user_metadata.
+ */
+async function getValidAccessToken(forceRefresh = false) {
   if (!session?.access_token) return null;
+
+  const isTokenBloated = session.access_token.length > 3500;
   const now = Math.floor(Date.now() / 1000);
-  if (session.expires_at && session.expires_at - 60 > now) return session.access_token;
+  if (!forceRefresh && !isTokenBloated && session.expires_at && session.expires_at - 60 > now) {
+    return session.access_token;
+  }
+
   if (!session.refresh_token) {
     storeSession(null);
     return null;
   }
+
   // Una sola renovación a la vez: Supabase rota el refresh token en cada uso
   if (!refreshPromise) {
-    refreshPromise = authFetch('token?grant_type=refresh_token', {
-      method: 'POST',
-      body: { refresh_token: session.refresh_token }
-    })
-      .then((data) => {
+    refreshPromise = (async () => {
+      try {
+        let pendingBase64Avatar = '';
+        if (isTokenBloated) {
+          if (session?.user?.avatar?.startsWith('data:image/')) {
+            pendingBase64Avatar = session.user.avatar;
+          }
+          // Limpiar primero el Base64 de user_metadata para que el nuevo JWT sea ligero (~1 KB)
+          await authFetch('user', {
+            method: 'PUT',
+            token: session.access_token,
+            body: { data: { avatar_url: '' } }
+          }).catch(() => {});
+        }
+
+        const data = await authFetch('token?grant_type=refresh_token', {
+          method: 'POST',
+          body: { refresh_token: session.refresh_token }
+        });
         storeSession(sessionFromTokens(data, session?.user || null));
+
+        if (pendingBase64Avatar && session?.access_token) {
+          uploadAvatarToStorage(session.access_token, undefined, pendingBase64Avatar)
+            .then((shortUrl) => {
+              if (shortUrl && session?.user) {
+                storeSession({ ...session, user: { ...session.user, avatar: shortUrl } });
+                if (remoteProfile) remoteProfile.avatar = shortUrl;
+              }
+            })
+            .catch(() => {});
+        }
+
         return session.access_token;
-      })
-      .catch((err) => {
+      } catch (err) {
         console.warn('No se pudo renovar la sesión:', err);
         // Solo cerramos la sesión si Supabase la rechaza (no por fallos de red)
         if ([400, 401, 403].includes(err.status)) storeSession(null);
         return null;
-      })
-      .finally(() => {
+      } finally {
         refreshPromise = null;
-      });
+      }
+    })();
   }
   return refreshPromise;
 }
@@ -1036,20 +1094,42 @@ export const dataService = {
     if (!this.isAdmin()) {
       throw new Error('Acceso restringido al administrador.');
     }
-    const token = await getValidAccessToken();
-    const resp = await fetch(`/.netlify/functions/admin?action=${encodeURIComponent(action)}`, {
-      method,
-      headers: {
-        'Accept': 'application/json',
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
-      body: body ? JSON.stringify(body) : undefined
-    });
+
+    const executeCall = async (token) => {
+      if (!token) {
+        throw new Error('Tu sesión ha caducado en este dispositivo. Abre tu perfil y vuelve a iniciar sesión.');
+      }
+      const tokenFitsHeader = token.length < 3500;
+      const effectiveMethod = !tokenFitsHeader && method === 'GET' ? 'POST' : method;
+      const effectiveBody = tokenFitsHeader
+        ? body
+        : { ...(body || {}), userToken: token };
+
+      return fetch(`/.netlify/functions/admin?action=${encodeURIComponent(action)}`, {
+        method: effectiveMethod,
+        headers: {
+          'Accept': 'application/json',
+          ...(effectiveBody ? { 'Content-Type': 'application/json' } : {}),
+          ...(tokenFitsHeader ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: effectiveBody ? JSON.stringify(effectiveBody) : undefined
+      });
+    };
+
+    let token = await getValidAccessToken();
+    let resp = await executeCall(token);
+
+    if (resp.status === 401) {
+      token = await getValidAccessToken(true);
+      if (token) {
+        resp = await executeCall(token);
+      }
+    }
+
     const contentType = resp.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       throw new Error(
-        'La función de servidor (/.netlify/functions/admin) solo está disponible en Netlify (o con netlify dev).'
+        `No se pudo conectar con la función de administración (HTTP ${resp.status}). Recarga la página o vuelve a iniciar sesión.`
       );
     }
     const data = await resp.json();
@@ -1280,8 +1360,23 @@ export const dataService = {
           date: r.created_at
         }));
       }
-      const metaAvatar = authUser?.user_metadata?.avatar_url ?? session?.user?.avatar ?? '';
+      let metaAvatar = authUser?.user_metadata?.avatar_url ?? session?.user?.avatar ?? '';
       const metaName = authUser?.user_metadata?.name || '';
+      const row = Array.isArray(profileRows) ? profileRows[0] : null;
+      const finalName = row?.name || metaName || '';
+
+      if (metaAvatar.startsWith('data:image/') && token) {
+        try {
+          const shortUrl = await uploadAvatarToStorage(token, finalName, metaAvatar);
+          if (shortUrl) {
+            metaAvatar = shortUrl;
+            await getValidAccessToken(true);
+          }
+        } catch {
+          // conservar el avatar en memoria si falla la migración a Storage
+        }
+      }
+
       if (authUser && session?.user) {
         storeSession({
           ...session,
@@ -1291,9 +1386,8 @@ export const dataService = {
           }
         });
       }
-      const row = Array.isArray(profileRows) ? profileRows[0] : null;
       remoteProfile = {
-        name: row?.name || metaName || '',
+        name: finalName,
         avatar: metaAvatar || '',
         is_admin: Boolean(row?.is_admin)
       };
@@ -1613,9 +1707,23 @@ export const dataService = {
       }).catch((err) => console.warn('No se pudo sincronizar el perfil en Supabase:', err));
 
       getValidAccessToken()
-        .then((token) => {
+        .then(async (token) => {
           if (!token) return;
-          return authFetch('user', {
+          if (nextAvatar.startsWith('data:image/')) {
+            const shortUrl = await uploadAvatarToStorage(token, clean, nextAvatar);
+            if (shortUrl) {
+              remoteProfile = { ...(remoteProfile || {}), name: clean, avatar: shortUrl };
+              localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean, avatar: shortUrl }));
+              if (session?.user) {
+                storeSession({
+                  ...session,
+                  user: { ...session.user, avatar: shortUrl }
+                });
+              }
+            }
+            return;
+          }
+          await authFetch('user', {
             method: 'PUT',
             token,
             body: {
@@ -1626,7 +1734,7 @@ export const dataService = {
             }
           });
         })
-        .catch((err) => console.warn('No se pudo sincronizar el avatar en Supabase Auth:', err));
+        .catch((err) => console.warn('No se pudo sincronizar el avatar en Supabase:', err));
     }
   }
 };
