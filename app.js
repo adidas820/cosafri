@@ -943,6 +943,9 @@ async function renderAdmin(activeTab = 'usuarios') {
   function renderUserRow(u) {
     const displayName = u.name?.trim() || 'Sin nombre definido';
     const initial = (u.name?.trim() || u.email || 'U').charAt(0).toLocaleUpperCase('es');
+    const avatarHtml = u.avatar
+      ? `<img class="avatar-img" src="${escapeHtml(u.avatar)}" alt="${escapeHtml(displayName)}" />`
+      : escapeHtml(initial);
     const scoreBadge =
       u.averageScore === null
         ? '<span class="score-badge is-pending">Sin intentos</span>'
@@ -950,7 +953,7 @@ async function renderAdmin(activeTab = 'usuarios') {
 
     return `<div class="admin-user-row" data-search="${escapeHtml(`${displayName} ${u.email}`.toLowerCase())}">
       <div class="admin-user-main">
-        <span class="avatar admin-user-avatar">${escapeHtml(initial)}</span>
+        <span class="avatar admin-user-avatar">${avatarHtml}</span>
         <div class="admin-user-copy">
           <div class="admin-user-title">
             <strong>${escapeHtml(displayName)}</strong>
@@ -1079,17 +1082,59 @@ $('#nav-admin')?.addEventListener('click', (event) => { event.preventDefault(); 
 window.addEventListener('hashchange', renderRoute);
 $('#today-label').textContent = formatDate();
 
+let pendingAvatarDataUrl = '';
+
+function renderAvatarContent(node, name, avatarUrl) {
+  if (!node) return;
+  if (avatarUrl) {
+    node.innerHTML = `<img class="avatar-img" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(name || 'Perfil')}" />`;
+  } else {
+    const clean = (name || '').trim();
+    node.textContent = !clean || clean === 'Mi espacio' ? 'E' : clean.charAt(0).toLocaleUpperCase('es');
+  }
+}
+
 function updateProfileLabels() {
-  const name = dataService.readProfile().name?.trim() || 'Mi espacio';
+  const profile = dataService.readProfile();
+  const name = profile.name?.trim() || 'Mi espacio';
+  const avatar = profile.avatar || '';
   $('#sidebar-profile-name').textContent = name;
   const user = dataService.getUser();
   $('#sidebar-profile-status').textContent = dataService.isLoggedIn() ? (user?.email || 'Sesión iniciada') : 'Perfil local';
   document.querySelectorAll('.profile-initial').forEach((node) => {
-    node.textContent = name === 'Mi espacio' ? 'E' : name.charAt(0).toLocaleUpperCase('es');
+    renderAvatarContent(node, name, avatar);
   });
   if ($('#nav-admin')) {
     $('#nav-admin').hidden = !dataService.isAdmin();
   }
+}
+
+function resizeImageToAvatarDataUrl(file, size = 160) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      reject(new Error('Selecciona un archivo de imagen válido.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('El archivo no es una imagen válida.'));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderAccountState() {
@@ -1112,9 +1157,21 @@ function setTheme(theme) {
   try { localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch { /* El tema sigue activo durante esta visita. */ }
 }
 
+function updateModalAvatarPreview() {
+  const name = $('#profile-name-input')?.value?.trim() || dataService.readProfile().name || 'Mi espacio';
+  renderAvatarContent($('#profile-modal-avatar'), name, pendingAvatarDataUrl);
+  const removeBtn = $('#remove-avatar-btn');
+  if (removeBtn) {
+    removeBtn.hidden = !pendingAvatarDataUrl;
+  }
+}
+
 function openProfile() {
   const modal = $('#profile-modal');
-  $('#profile-name-input').value = dataService.readProfile().name || '';
+  const currentProfile = dataService.readProfile();
+  $('#profile-name-input').value = currentProfile.name || '';
+  pendingAvatarDataUrl = currentProfile.avatar || '';
+  updateModalAvatarPreview();
   const scores = dataService.readScores();
   const attempts = scores.length;
   const questions = scores.reduce((sum, score) => sum + (Number(score.total) || 0), 0);
@@ -1361,10 +1418,42 @@ $('#open-profile-top').addEventListener('click', openProfile);
 $('#close-profile').addEventListener('click', closeProfile);
 $('#profile-modal').addEventListener('click', (event) => { if (event.target.id === 'profile-modal') closeProfile(); });
 
+$('#upload-avatar-btn')?.addEventListener('click', () => {
+  $('#profile-avatar-input')?.click();
+});
+
+$('#profile-modal-avatar')?.addEventListener('click', () => {
+  $('#profile-avatar-input')?.click();
+});
+
+$('#profile-avatar-input')?.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    pendingAvatarDataUrl = await resizeImageToAvatarDataUrl(file, 160);
+    updateModalAvatarPreview();
+    showToast('Foto lista. Pulsa «Guardar perfil» para aplicar los cambios.');
+  } catch (err) {
+    showToast(err.message || 'No se pudo procesar la imagen.', 4500);
+  }
+});
+
+$('#remove-avatar-btn')?.addEventListener('click', () => {
+  pendingAvatarDataUrl = '';
+  updateModalAvatarPreview();
+});
+
+$('#profile-name-input')?.addEventListener('input', () => {
+  if (!pendingAvatarDataUrl) {
+    updateModalAvatarPreview();
+  }
+});
+
 $('#save-profile').addEventListener('click', () => {
   const name = $('#profile-name-input').value;
   try {
-    dataService.saveProfile(name);
+    dataService.saveProfile(name, pendingAvatarDataUrl);
   } catch {
     showToast('No se pudo guardar el perfil en este navegador.');
     return;

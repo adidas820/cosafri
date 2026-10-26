@@ -193,6 +193,7 @@ export const handler = async (event) => {
             id: u.id,
             email,
             name: prof?.name || u.user_metadata?.name || '',
+            avatar: u.user_metadata?.avatar_url || '',
             isAdmin,
             createdAt: u.created_at || null,
             lastSignInAt: u.last_sign_in_at || null,

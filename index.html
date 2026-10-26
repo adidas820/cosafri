@@ -61,7 +61,17 @@
           <button class="secondary-button" id="logout-button" type="button">Cerrar sesión</button>
         </div>
       </div>
-      <label class="profile-name-field">Nombre<input id="profile-name-input" type="text" maxlength="40" autocomplete="name" placeholder="¿Cómo te llamas?"></label>
+      <div class="profile-identity-editor">
+        <div class="profile-avatar-picker">
+          <span class="avatar profile-modal-avatar profile-initial" id="profile-modal-avatar">E</span>
+          <div class="profile-avatar-actions">
+            <input id="profile-avatar-input" type="file" accept="image/*" hidden />
+            <button class="secondary-button" id="upload-avatar-btn" type="button">Cambiar foto</button>
+            <button class="back-link danger-link" id="remove-avatar-btn" type="button" hidden>Quitar foto</button>
+          </div>
+        </div>
+        <label class="profile-name-field">Nombre<input id="profile-name-input" type="text" maxlength="40" autocomplete="name" placeholder="¿Cómo te llamas?"></label>
+      </div>
       <div class="profile-stats" id="profile-stats"></div>
       <div class="profile-history-wrap" id="profile-history-wrap"></div>
       <p class="profile-local-note" id="profile-storage-note">El nombre y el historial se guardan solo en este navegador.</p>

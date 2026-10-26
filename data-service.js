@@ -93,7 +93,8 @@ function sessionFromTokens(data, fallbackUser = null) {
       ? {
           id: data.user.id,
           email: data.user.email,
-          role: data.user.app_metadata?.role || data.user.user_metadata?.role || fallbackUser?.role || null
+          role: data.user.app_metadata?.role || data.user.user_metadata?.role || fallbackUser?.role || null,
+          avatar: data.user.user_metadata?.avatar_url || fallbackUser?.avatar || ''
         }
       : fallbackUser
   };
@@ -1252,7 +1253,8 @@ export const dataService = {
     if (!this.isLoggedIn()) return;
     const userId = session.user.id;
     try {
-      const [scoresRows, profileRows] = await Promise.all([
+      const token = await getValidAccessToken();
+      const [scoresRows, profileRows, authUser] = await Promise.all([
         supabaseFetch(
           'quiz_scores',
           `user_id=eq.${encodeURIComponent(userId)}&select=subject,section,score,total,percentage,created_at&order=created_at.desc&limit=40`
@@ -1265,7 +1267,8 @@ export const dataService = {
             'student_profiles',
             `id=eq.${encodeURIComponent(userId)}&select=name`
           ).catch(() => null)
-        )
+        ),
+        token ? authFetch('user', { token }).catch(() => null) : Promise.resolve(null)
       ]);
       if (Array.isArray(scoresRows)) {
         remoteScores = scoresRows.map((r) => ({
@@ -1277,12 +1280,23 @@ export const dataService = {
           date: r.created_at
         }));
       }
-      if (Array.isArray(profileRows) && profileRows[0]) {
-        remoteProfile = {
-          name: profileRows[0].name || '',
-          is_admin: Boolean(profileRows[0].is_admin)
-        };
+      const metaAvatar = authUser?.user_metadata?.avatar_url ?? session?.user?.avatar ?? '';
+      const metaName = authUser?.user_metadata?.name || '';
+      if (authUser && session?.user) {
+        storeSession({
+          ...session,
+          user: {
+            ...session.user,
+            avatar: metaAvatar
+          }
+        });
       }
+      const row = Array.isArray(profileRows) ? profileRows[0] : null;
+      remoteProfile = {
+        name: row?.name || metaName || '',
+        avatar: metaAvatar || '',
+        is_admin: Boolean(row?.is_admin)
+      };
     } catch (err) {
       console.warn('No se pudieron sincronizar los datos del usuario:', err);
     }
@@ -1551,24 +1565,43 @@ export const dataService = {
   },
 
   /**
-   * Perfil de estudiante
+   * Perfil de estudiante (nombre + foto de perfil sincronizados en localStorage y Supabase)
    */
   readProfile() {
-    if (this.isLoggedIn() && remoteProfile?.name) {
-      return remoteProfile;
-    }
+    let local = { name: '', avatar: '' };
     try {
-      return JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: '' };
+      local = JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: '', avatar: '' };
     } catch {
-      return { name: '' };
+      local = { name: '', avatar: '' };
     }
+    if (this.isLoggedIn() && remoteProfile) {
+      return {
+        name: remoteProfile.name || local.name || '',
+        avatar: remoteProfile.avatar ?? session?.user?.avatar ?? local.avatar ?? '',
+        is_admin: Boolean(remoteProfile.is_admin)
+      };
+    }
+    return {
+      name: local.name || '',
+      avatar: local.avatar || ''
+    };
   },
 
-  saveProfile(name) {
-    const clean = name.trim();
-    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean }));
+  saveProfile(name, avatar = undefined) {
+    const current = this.readProfile();
+    const clean = String(name ?? current.name ?? '').trim();
+    const nextAvatar = avatar !== undefined ? String(avatar || '') : String(current.avatar || '');
+
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean, avatar: nextAvatar }));
+
     if (this.isLoggedIn() && this.isAuthAvailable()) {
-      remoteProfile = { ...(remoteProfile || {}), name: clean };
+      remoteProfile = { ...(remoteProfile || {}), name: clean, avatar: nextAvatar };
+      if (session?.user) {
+        storeSession({
+          ...session,
+          user: { ...session.user, avatar: nextAvatar }
+        });
+      }
       supabaseFetch('student_profiles', 'on_conflict=id', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -1578,6 +1611,22 @@ export const dataService = {
           updated_at: new Date().toISOString()
         }
       }).catch((err) => console.warn('No se pudo sincronizar el perfil en Supabase:', err));
+
+      getValidAccessToken()
+        .then((token) => {
+          if (!token) return;
+          return authFetch('user', {
+            method: 'PUT',
+            token,
+            body: {
+              data: {
+                name: clean,
+                avatar_url: nextAvatar
+              }
+            }
+          });
+        })
+        .catch((err) => console.warn('No se pudo sincronizar el avatar en Supabase Auth:', err));
     }
   }
 };
