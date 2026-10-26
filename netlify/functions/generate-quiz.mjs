@@ -52,6 +52,7 @@ export const handler = async (event) => {
         process.env.SUPABASE_ANON_KEY ||
         ''
       ).trim();
+      const anonKey = (process.env.SUPABASE_ANON_KEY || supabaseKey).trim();
       if (!supabaseUrl || !supabaseKey) {
         return {
           statusCode: 500,
@@ -59,6 +60,66 @@ export const handler = async (event) => {
           body: JSON.stringify({ error: 'Supabase no está configurado en el servidor.' })
         };
       }
+
+      // Verificar identidad y permisos de administrador del usuario autenticado
+      const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+      const userToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      if (!userToken) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ error: 'Debes iniciar sesión como administrador para eliminar tests.' })
+        };
+      }
+
+      const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${userToken}`
+        }
+      });
+      if (!userResp.ok) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ error: 'Sesión inválida o expirada.' })
+        };
+      }
+      const authUser = await userResp.json();
+      const adminEmailEnv = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+      const userEmail = String(authUser?.email || '').trim().toLowerCase();
+
+      let isAdmin =
+        (adminEmailEnv && userEmail && adminEmailEnv === userEmail) ||
+        authUser?.app_metadata?.role === 'admin' ||
+        authUser?.user_metadata?.role === 'admin';
+
+      if (!isAdmin && authUser?.id) {
+        const profResp = await fetch(
+          `${supabaseUrl}/rest/v1/student_profiles?id=eq.${encodeURIComponent(authUser.id)}&select=is_admin`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }
+        );
+        if (profResp.ok) {
+          const profRows = await profResp.json().catch(() => []);
+          if (Array.isArray(profRows) && profRows[0]?.is_admin === true) {
+            isAdmin = true;
+          }
+        }
+      }
+
+      if (!isAdmin) {
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({ error: 'Acceso denegado: solo el administrador puede eliminar tests.' })
+        };
+      }
+
       const delUrl = `${supabaseUrl}/rest/v1/sections?subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&id=eq.${encodeURIComponent(sectionId)}`;
       const delResp = await fetch(delUrl, {
         method: 'DELETE',

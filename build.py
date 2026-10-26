@@ -33,6 +33,7 @@ supabase_service_key = (
     or os.environ.get('SUPABASE_SERVICE_KEY', '').strip()
 )
 gemini_api_key = os.environ.get('GEMINI_API_KEY', '').strip()
+admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
 
 enabled = 'true' if supabase_url and supabase_anon_key else 'false'
 has_server_gemini = 'true' if gemini_api_key else 'false'
@@ -43,6 +44,7 @@ config_content = f"""/**
  * NO editar a mano en producción.
  */
 export const CONFIG = {{
+  adminEmail: '{admin_email}',
   supabase: {{
     url: '{supabase_url}',
     anonKey: '{supabase_anon_key}',

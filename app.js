@@ -129,8 +129,8 @@ function sectionScoreBadge(subjectName, sectionName, scores = dataService.readSc
 }
 
 function deleteAiTestButton(subjectId, topicId, section) {
-  if (!String(section?.id || '').startsWith('ia-')) return '';
-  return `<button class="icon-danger-button" type="button" data-delete-section="${escapeHtml(section.id)}" data-subject="${escapeHtml(subjectId)}" data-topic="${escapeHtml(topicId)}" data-name="${escapeHtml(section.name)}" title="Eliminar este test generado con IA" aria-label="Eliminar test ${escapeHtml(section.name)}">${ICONS.trash}</button>`;
+  if (!dataService.isAdmin() || !String(section?.id || '').startsWith('ia-')) return '';
+  return `<button class="icon-danger-button" type="button" data-delete-section="${escapeHtml(section.id)}" data-subject="${escapeHtml(subjectId)}" data-topic="${escapeHtml(topicId)}" data-name="${escapeHtml(section.name)}" title="Eliminar este test generado con IA (Solo Administrador)" aria-label="Eliminar test ${escapeHtml(section.name)}">${ICONS.trash}</button>`;
 }
 
 function subjectCard(subject) {

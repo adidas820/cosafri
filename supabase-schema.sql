@@ -66,8 +66,11 @@ create table if not exists quiz_scores (
 create table if not exists student_profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   name text,
+  is_admin boolean default false not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+alter table student_profiles add column if not exists is_admin boolean default false not null;
 
 create table if not exists student_mistakes (
   user_id uuid references auth.users(id) on delete cascade not null,
@@ -99,7 +102,8 @@ create policy "Lectura pública para sections" on sections for select using (tru
 drop policy if exists "Lectura pública para questions" on questions;
 create policy "Lectura pública para questions" on questions for select using (true);
 
--- Políticas de inserción y borrado para tests generados con IA desde la web
+-- Políticas de inserción para tests generados con IA desde la web
+-- (El borrado se realiza únicamente en servidor tras verificar que el usuario es administrador)
 drop policy if exists "Inserción pública para sections" on sections;
 create policy "Inserción pública para sections" on sections for insert with check (true);
 
@@ -107,10 +111,7 @@ drop policy if exists "Inserción pública para questions" on questions;
 create policy "Inserción pública para questions" on questions for insert with check (true);
 
 drop policy if exists "Borrado de sections de IA" on sections;
-create policy "Borrado de sections de IA" on sections for delete using (id like 'ia-%');
-
 drop policy if exists "Borrado de questions de IA" on questions;
-create policy "Borrado de questions de IA" on questions for delete using (section_id like 'ia-%');
 
 -- Políticas para puntuaciones, perfiles y banco de fallos
 drop policy if exists "Usuarios gestionan sus propias notas" on quiz_scores;

@@ -89,7 +89,13 @@ function sessionFromTokens(data, fallbackUser = null) {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: expiresAt,
-    user: data.user ? { id: data.user.id, email: data.user.email } : fallbackUser
+    user: data.user
+      ? {
+          id: data.user.id,
+          email: data.user.email,
+          role: data.user.app_metadata?.role || data.user.user_metadata?.role || fallbackUser?.role || null
+        }
+      : fallbackUser
   };
 }
 
@@ -663,8 +669,12 @@ export const dataService = {
 
   /**
    * Elimina un cuestionario generado con IA (`ia-...`) de Supabase y de la caché local.
+   * Restringido exclusivamente al administrador.
    */
   async deleteSection(subjectId, topicId, sectionId) {
+    if (!this.isAdmin()) {
+      throw new Error('Solo el administrador puede eliminar tests.');
+    }
     if (!subjectId || !topicId || !sectionId || !String(sectionId).startsWith('ia-')) {
       throw new Error('Solo se pueden eliminar los tests generados con IA.');
     }
@@ -688,35 +698,19 @@ export const dataService = {
       // ignore storage errors
     }
 
-    // 2. Eliminar de Supabase (primero vía Netlify Function con service_role, y fallback directo por REST)
-    let deletedRemotely = false;
-    try {
-      const fnResp = await fetch('/.netlify/functions/generate-quiz', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subjectId, topicId, sectionId })
-      });
-      if (fnResp.ok) {
-        deletedRemotely = true;
-      } else if (fnResp.status !== 404 && fnResp.status !== 405 && fnResp.status !== 501) {
-        const errData = await fnResp.json().catch(() => ({}));
-        if (errData?.error) throw new Error(errData.error);
-      }
-    } catch (fnErr) {
-      if (fnErr.message && !fnErr.message.includes('Failed to fetch') && !fnErr.message.includes('NetworkError')) {
-        console.warn('Error en función de borrado, intentando vía cliente REST:', fnErr);
-      }
-    }
-
-    if (!deletedRemotely && SUPABASE_CONFIG.enabled && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
-      await supabaseFetch(
-        'sections',
-        `subject_id=eq.${encodeURIComponent(subjectId)}&topic_id=eq.${encodeURIComponent(topicId)}&id=eq.${encodeURIComponent(sectionId)}`,
-        {
-          method: 'DELETE',
-          headers: { Prefer: 'return=minimal' }
-        }
-      );
+    // 2. Eliminar de Supabase vía Netlify Function autenticada con el JWT del administrador
+    const token = await getValidAccessToken();
+    const fnResp = await fetch('/.netlify/functions/generate-quiz', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ subjectId, topicId, sectionId })
+    });
+    if (!fnResp.ok) {
+      const errData = await fnResp.json().catch(() => ({}));
+      throw new Error(errData?.error || `No se pudo eliminar el test (${fnResp.status}).`);
     }
 
     // 3. Limpiar cachés en memoria
@@ -1021,6 +1015,15 @@ export const dataService = {
     return Boolean(session?.access_token && session?.user?.id);
   },
 
+  isAdmin() {
+    if (!this.isLoggedIn()) return false;
+    if (remoteProfile?.is_admin === true) return true;
+    if (session?.user?.role === 'admin') return true;
+    const configuredAdmin = String(CONFIG?.adminEmail || '').trim().toLowerCase();
+    const userEmail = String(session?.user?.email || '').trim().toLowerCase();
+    return Boolean(configuredAdmin && userEmail && configuredAdmin === userEmail);
+  },
+
   getUser() {
     return session?.user || null;
   },
@@ -1115,8 +1118,13 @@ export const dataService = {
         ).catch(() => null),
         supabaseFetch(
           'student_profiles',
-          `id=eq.${encodeURIComponent(userId)}&select=name`
-        ).catch(() => null)
+          `id=eq.${encodeURIComponent(userId)}&select=name,is_admin`
+        ).catch(() =>
+          supabaseFetch(
+            'student_profiles',
+            `id=eq.${encodeURIComponent(userId)}&select=name`
+          ).catch(() => null)
+        )
       ]);
       if (Array.isArray(scoresRows)) {
         remoteScores = scoresRows.map((r) => ({
@@ -1128,8 +1136,11 @@ export const dataService = {
           date: r.created_at
         }));
       }
-      if (Array.isArray(profileRows) && profileRows[0]?.name) {
-        remoteProfile = { name: profileRows[0].name };
+      if (Array.isArray(profileRows) && profileRows[0]) {
+        remoteProfile = {
+          name: profileRows[0].name || '',
+          is_admin: Boolean(profileRows[0].is_admin)
+        };
       }
     } catch (err) {
       console.warn('No se pudieron sincronizar los datos del usuario:', err);
@@ -1398,7 +1409,7 @@ export const dataService = {
     const clean = name.trim();
     localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean }));
     if (this.isLoggedIn() && this.isAuthAvailable()) {
-      remoteProfile = { name: clean };
+      remoteProfile = { ...(remoteProfile || {}), name: clean };
       supabaseFetch('student_profiles', 'on_conflict=id', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

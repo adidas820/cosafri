@@ -6,4 +6,4 @@
 [build.environment]
   # SUPABASE_URL y SUPABASE_ANON_KEY son claves públicas de cliente que se inyectan en config.js.
   # SUPABASE_SERVICE_ROLE_KEY y GEMINI_API_KEY se mantienen 100% privadas en el servidor (build y Netlify Functions).
-  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,SUPABASE_ANON_KEY"
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,SUPABASE_ANON_KEY,ADMIN_EMAIL"
