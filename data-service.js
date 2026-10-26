@@ -1365,7 +1365,7 @@ export const dataService = {
       let metaAvatar = authUser?.user_metadata?.avatar_url ?? session?.user?.avatar ?? '';
       const metaName = authUser?.user_metadata?.name || '';
       const metaBio = authUser?.user_metadata?.bio || '';
-      const metaBanner = authUser?.user_metadata?.banner || 'gold';
+      const metaBanner = authUser?.user_metadata?.banner || '';
       const row = Array.isArray(profileRows) ? profileRows[0] : null;
       const finalName = row?.name || metaName || '';
 
