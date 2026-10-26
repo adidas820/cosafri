@@ -125,7 +125,7 @@ async function authFetch(path, { method = 'GET', body, token } = {}) {
  * Sube un avatar en Base64 al bucket público de Supabase Storage vía Netlify Function
  * para obtener una URL corta (~90 bytes) y no inflar jamás el JWT de Supabase Auth.
  */
-async function uploadAvatarToStorage(token, name, avatarDataUrl) {
+async function uploadAvatarToStorage(token, name, avatarDataUrl, extra = {}) {
   const sendInHeader = token && token.length < 3500;
   const resp = await fetch('/.netlify/functions/admin?action=upload-avatar', {
     method: 'POST',
@@ -137,6 +137,8 @@ async function uploadAvatarToStorage(token, name, avatarDataUrl) {
     body: JSON.stringify({
       name,
       avatarDataUrl,
+      ...(extra.bio !== undefined ? { bio: extra.bio } : {}),
+      ...(extra.banner !== undefined ? { banner: extra.banner } : {}),
       ...(sendInHeader ? {} : { userToken: token })
     })
   });
@@ -1362,12 +1364,17 @@ export const dataService = {
       }
       let metaAvatar = authUser?.user_metadata?.avatar_url ?? session?.user?.avatar ?? '';
       const metaName = authUser?.user_metadata?.name || '';
+      const metaBio = authUser?.user_metadata?.bio || '';
+      const metaBanner = authUser?.user_metadata?.banner || 'gold';
       const row = Array.isArray(profileRows) ? profileRows[0] : null;
       const finalName = row?.name || metaName || '';
 
       if (metaAvatar.startsWith('data:image/') && token) {
         try {
-          const shortUrl = await uploadAvatarToStorage(token, finalName, metaAvatar);
+          const shortUrl = await uploadAvatarToStorage(token, finalName, metaAvatar, {
+            bio: metaBio,
+            banner: metaBanner
+          });
           if (shortUrl) {
             metaAvatar = shortUrl;
             await getValidAccessToken(true);
@@ -1389,6 +1396,8 @@ export const dataService = {
       remoteProfile = {
         name: finalName,
         avatar: metaAvatar || '',
+        bio: metaBio,
+        banner: metaBanner,
         is_admin: Boolean(row?.is_admin)
       };
     } catch (err) {
@@ -1659,37 +1668,52 @@ export const dataService = {
   },
 
   /**
-   * Perfil de estudiante (nombre + foto de perfil sincronizados en localStorage y Supabase)
+   * Perfil de estudiante (nombre, bio, banner y foto de perfil sincronizados en localStorage y Supabase)
    */
   readProfile() {
-    let local = { name: '', avatar: '' };
+    let local = { name: '', avatar: '', bio: '', banner: 'gold' };
     try {
-      local = JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: '', avatar: '' };
+      local = JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: '', avatar: '', bio: '', banner: 'gold' };
     } catch {
-      local = { name: '', avatar: '' };
+      local = { name: '', avatar: '', bio: '', banner: 'gold' };
     }
     if (this.isLoggedIn() && remoteProfile) {
       return {
         name: remoteProfile.name || local.name || '',
         avatar: remoteProfile.avatar ?? session?.user?.avatar ?? local.avatar ?? '',
+        bio: remoteProfile.bio || local.bio || '',
+        banner: remoteProfile.banner || local.banner || 'gold',
         is_admin: Boolean(remoteProfile.is_admin)
       };
     }
     return {
       name: local.name || '',
-      avatar: local.avatar || ''
+      avatar: local.avatar || '',
+      bio: local.bio || '',
+      banner: local.banner || 'gold'
     };
   },
 
-  saveProfile(name, avatar = undefined) {
+  saveProfile(name, avatar = undefined, extra = {}) {
     const current = this.readProfile();
     const clean = String(name ?? current.name ?? '').trim();
     const nextAvatar = avatar !== undefined ? String(avatar || '') : String(current.avatar || '');
+    const nextBio = extra.bio !== undefined ? String(extra.bio || '').trim().slice(0, 160) : String(current.bio || '');
+    const nextBanner = extra.banner !== undefined ? String(extra.banner || 'gold').trim() : String(current.banner || 'gold');
 
-    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean, avatar: nextAvatar }));
+    localStorage.setItem(
+      PROFILE_KEY,
+      JSON.stringify({ name: clean, avatar: nextAvatar, bio: nextBio, banner: nextBanner })
+    );
 
     if (this.isLoggedIn() && this.isAuthAvailable()) {
-      remoteProfile = { ...(remoteProfile || {}), name: clean, avatar: nextAvatar };
+      remoteProfile = {
+        ...(remoteProfile || {}),
+        name: clean,
+        avatar: nextAvatar,
+        bio: nextBio,
+        banner: nextBanner
+      };
       if (session?.user) {
         storeSession({
           ...session,
@@ -1709,19 +1733,31 @@ export const dataService = {
       getValidAccessToken()
         .then(async (token) => {
           if (!token) return;
-          if (nextAvatar.startsWith('data:image/')) {
-            const shortUrl = await uploadAvatarToStorage(token, clean, nextAvatar);
-            if (shortUrl) {
-              remoteProfile = { ...(remoteProfile || {}), name: clean, avatar: shortUrl };
-              localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: clean, avatar: shortUrl }));
+          if (nextAvatar.startsWith('data:image/') || nextAvatar === '') {
+            const shortUrl = await uploadAvatarToStorage(token, clean, nextAvatar, {
+              bio: nextBio,
+              banner: nextBanner
+            }).catch(() => '');
+            if (shortUrl || nextAvatar === '') {
+              remoteProfile = {
+                ...(remoteProfile || {}),
+                name: clean,
+                avatar: shortUrl,
+                bio: nextBio,
+                banner: nextBanner
+              };
+              localStorage.setItem(
+                PROFILE_KEY,
+                JSON.stringify({ name: clean, avatar: shortUrl, bio: nextBio, banner: nextBanner })
+              );
               if (session?.user) {
                 storeSession({
                   ...session,
                   user: { ...session.user, avatar: shortUrl }
                 });
               }
+              return;
             }
-            return;
           }
           await authFetch('user', {
             method: 'PUT',
@@ -1729,7 +1765,9 @@ export const dataService = {
             body: {
               data: {
                 name: clean,
-                avatar_url: nextAvatar
+                bio: nextBio,
+                banner: nextBanner,
+                ...(nextAvatar.startsWith('http') || nextAvatar === '' ? { avatar_url: nextAvatar } : {})
               }
             }
           });

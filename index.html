@@ -22,6 +22,7 @@
         <a href="#inicio" class="nav-link active" id="nav-home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10 8.5-7 8.5 7v10.5h-6v-7h-5v7h-6V10Z"/></svg><span>Inicio</span></a>
         <a href="#asignaturas" class="nav-link" id="nav-subjects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></svg><span>Asignaturas</span><span class="nav-count" id="subject-count">0</span></a>
         <a href="#tests" class="nav-link" id="nav-tests"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h11v17H5V4h3Z"/><path d="M9 4V2h6v2M8 9h8M8 13h3m2 0h3M8 17h2"/></svg><span>Tests</span></a>
+        <a href="#perfil" class="nav-link" id="nav-profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Perfil</span></a>
         <a href="#admin" class="nav-link" id="nav-admin" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5.5v6c0 5.25 3.4 10.15 8 11.5 4.6-1.35 8-6.25 8-11.5v-6L12 2Z"/><path d="m9.5 12 2 2 3.5-3.5"/></svg><span>Panel Admin</span></a>
       </nav>
       <div class="sidebar-label subject-label">MIS ASIGNATURAS</div>
@@ -35,47 +36,46 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="modal-backdrop" id="profile-modal" hidden>
-    <section class="profile-modal panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-      <button class="modal-close" id="close-profile" type="button" aria-label="Cerrar perfil">×</button>
-      <p class="eyebrow">TU ESPACIO PERSONAL</p><h2 id="profile-title">Perfil de estudiante</h2>
-      <div class="account-box" id="account-box">
-        <div id="account-signed-out">
-          <p class="account-title">Cuenta</p>
-          <p class="account-text">Inicia sesión con email y contraseña para entrar en todos tus dispositivos tantas veces como quieras, o pide un enlace de acceso único al correo.</p>
-          <form class="account-form account-form-stack" id="login-form">
-            <input id="login-email" type="email" required autocomplete="email" placeholder="tu@email.com" />
-            <input id="login-password" type="password" minlength="6" autocomplete="current-password" placeholder="Contraseña (mín. 6 caracteres)" />
-            <div class="account-actions">
-              <button class="primary-button" id="login-submit" type="submit">Entrar / Crear cuenta</button>
-              <button class="secondary-button" id="magic-link-button" type="button">Enviar enlace al correo</button>
-            </div>
-          </form>
+    <section class="profile-modal edit-profile-modal panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="edit-profile-topbar">
+        <div class="edit-profile-topbar-left">
+          <button class="modal-close edit-modal-close" id="close-profile" type="button" aria-label="Cerrar editor">×</button>
+          <h2 id="profile-title">Editar perfil</h2>
         </div>
-        <div id="account-signed-in" hidden>
-          <p class="account-title">Cuenta</p>
-          <p class="account-text">Sesión iniciada como <strong id="account-email"></strong>. Tu sesión permanece activa en este navegador.</p>
-          <div class="account-password-row">
-            <input id="new-password-input" type="password" minlength="6" autocomplete="new-password" placeholder="Definir o cambiar contraseña (mín. 6 caract.)" />
-            <button class="secondary-button" id="save-password-button" type="button">Guardar clave</button>
-          </div>
-          <button class="secondary-button" id="logout-button" type="button">Cerrar sesión</button>
+        <button class="primary-button x-pill-btn" id="save-profile" type="button">Guardar</button>
+      </div>
+      <div class="x-edit-banner" id="edit-profile-banner" data-banner="gold">
+        <div class="x-banner-swatches" role="group" aria-label="Color de portada">
+          <button type="button" class="x-banner-swatch active" data-banner-color="gold" title="Oro / Gruvbox"></button>
+          <button type="button" class="x-banner-swatch" data-banner-color="violet" title="Violeta"></button>
+          <button type="button" class="x-banner-swatch" data-banner-color="emerald" title="Esmeralda"></button>
+          <button type="button" class="x-banner-swatch" data-banner-color="ocean" title="Azul océano"></button>
+          <button type="button" class="x-banner-swatch" data-banner-color="crimson" title="Carmesí"></button>
         </div>
       </div>
-      <div class="profile-identity-editor">
-        <div class="profile-avatar-picker">
-          <span class="avatar profile-modal-avatar profile-initial" id="profile-modal-avatar">E</span>
-          <div class="profile-avatar-actions">
-            <input id="profile-avatar-input" type="file" accept="image/*" hidden />
-            <button class="secondary-button" id="upload-avatar-btn" type="button">Cambiar foto</button>
-            <button class="back-link danger-link" id="remove-avatar-btn" type="button" hidden>Quitar foto</button>
-          </div>
+      <div class="x-edit-avatar-row">
+        <div class="x-edit-avatar-wrap">
+          <span class="avatar x-avatar-xl profile-initial" id="profile-modal-avatar">E</span>
+          <button class="x-avatar-cam-btn" id="upload-avatar-btn" type="button" title="Cambiar foto de perfil" aria-label="Cambiar foto de perfil">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
         </div>
-        <label class="profile-name-field">Nombre<input id="profile-name-input" type="text" maxlength="40" autocomplete="name" placeholder="¿Cómo te llamas?"></label>
+        <div class="profile-avatar-actions">
+          <input id="profile-avatar-input" type="file" accept="image/*" hidden />
+          <button class="secondary-button" id="upload-avatar-text-btn" type="button">Subir foto</button>
+          <button class="back-link danger-link" id="remove-avatar-btn" type="button" hidden>Quitar foto</button>
+        </div>
       </div>
-      <div class="profile-stats" id="profile-stats"></div>
-      <div class="profile-history-wrap" id="profile-history-wrap"></div>
-      <p class="profile-local-note" id="profile-storage-note">El nombre y el historial se guardan solo en este navegador.</p>
-      <button class="primary-button" id="save-profile" type="button">Guardar perfil</button>
+      <div class="x-edit-fields">
+        <label class="profile-name-field">
+          <span>Nombre</span>
+          <input id="profile-name-input" type="text" maxlength="40" autocomplete="name" placeholder="¿Cómo te llamas?" />
+        </label>
+        <label class="profile-name-field">
+          <span>Biografía / Especialidad</span>
+          <textarea id="profile-bio-input" rows="3" maxlength="160" placeholder="Ej.: Estudiante · Preparando exámenes con Cuaderno"></textarea>
+        </label>
+      </div>
     </section>
   </div>
   <div class="modal-backdrop" id="generate-quiz-modal" hidden>

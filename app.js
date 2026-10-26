@@ -77,12 +77,15 @@ function setNavigation(section, label) {
   $('#nav-home').classList.toggle('active', section === 'home');
   $('#nav-subjects').classList.toggle('active', section === 'subjects');
   $('#nav-tests').classList.toggle('active', section === 'tests');
+  $('#nav-profile')?.classList.toggle('active', section === 'profile');
   $('#nav-admin')?.classList.toggle('active', section === 'admin');
   const defaultLabel =
     section === 'home'
       ? 'Inicio'
       : section === 'subjects'
       ? 'Asignaturas'
+      : section === 'profile'
+      ? 'Perfil'
       : section === 'admin'
       ? 'Panel Admin'
       : 'Tests';
@@ -628,8 +631,10 @@ async function renderAdmin(activeTab = 'usuarios') {
   setNavigation('admin', 'Panel Admin');
 
   if (!dataService.isAdmin()) {
-    $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${ICONS.shield}</span><p class="eyebrow">ZONA RESTRINGIDA</p><h2>Acceso exclusivo para el administrador</h2><p>Inicia sesión con tu cuenta de administrador desde tu perfil para abrir el panel de control.</p><div class="result-buttons"><button class="primary-button" type="button" id="admin-login-btn">Abrir perfil ${ICONS.arrow}</button><a class="secondary-button" href="#inicio">Volver al inicio</a></div></section>`;
-    $('#admin-login-btn')?.addEventListener('click', openProfile);
+    $('#page-content').innerHTML = `<section class="panel result-card"><span class="result-mark">${ICONS.shield}</span><p class="eyebrow">ZONA RESTRINGIDA</p><h2>Acceso exclusivo para el administrador</h2><p>Inicia sesión con tu cuenta de administrador desde tu perfil para abrir el panel de control.</p><div class="result-buttons"><button class="primary-button" type="button" id="admin-login-btn">Ir a mi cuenta ${ICONS.arrow}</button><a class="secondary-button" href="#inicio">Volver al inicio</a></div></section>`;
+    $('#admin-login-btn')?.addEventListener('click', () => {
+      location.hash = '#perfil/cuenta';
+    });
     return;
   }
 
@@ -1061,6 +1066,384 @@ async function renderAdmin(activeTab = 'usuarios') {
   });
 }
 
+async function renderProfile(tab = 'actividad') {
+  stopExamTimer();
+  setNavigation('profile', 'Perfil');
+
+  const profile = dataService.readProfile();
+  const loggedIn = dataService.isLoggedIn();
+  const isAdmin = dataService.isAdmin();
+  const user = dataService.getUser();
+  const displayName = profile.name?.trim() || 'Mi espacio';
+  const email = user?.email || '';
+  const handle = email
+    ? `@${email.split('@')[0].replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase()}`
+    : `@${displayName.toLowerCase().replace(/\s+/g, '') || 'estudiante'}`;
+  const bio =
+    profile.bio?.trim() ||
+    'Estudiante en Cuaderno · Practicando con tests interactivos y simulacros de examen.';
+  const bannerColor = profile.banner || 'gold';
+
+  const [catalog, mistakes] = await Promise.all([
+    dataService.getCatalog(),
+    loggedIn ? dataService.getMistakes().catch(() => []) : Promise.resolve([])
+  ]);
+
+  const scores = dataService.readScores();
+  const attempts = scores.length;
+  const questions = scores.reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+  const correct = Math.round(scores.reduce((sum, s) => sum + (Number(s.score) || 0), 0) * 10) / 10;
+  const average = attempts
+    ? Math.round(scores.reduce((sum, s) => sum + (Number(s.percentage) || 0), 0) / attempts)
+    : null;
+
+  const initial = !displayName || displayName === 'Mi espacio' ? 'E' : displayName.charAt(0).toLocaleUpperCase('es');
+  const avatarInnerHtml = profile.avatar
+    ? `<img class="avatar-img" src="${escapeHtml(profile.avatar)}" alt="${escapeHtml(displayName)}" />`
+    : escapeHtml(initial);
+
+  let tabContentHtml = '';
+
+  if (tab === 'asignaturas') {
+    const bySubject = new Map();
+    for (const s of scores) {
+      const subName = s.subject || 'General';
+      const cur = bySubject.get(subName) || { count: 0, sum: 0, best: 0 };
+      const pct = Number(s.percentage) || 0;
+      cur.count += 1;
+      cur.sum += pct;
+      if (pct > cur.best) cur.best = pct;
+      bySubject.set(subName, cur);
+    }
+
+    const cardsHtml = catalog
+      .map((sub) => {
+        const stat = bySubject.get(sub.name) || { count: 0, sum: 0, best: 0 };
+        const avg = stat.count ? Math.round(stat.sum / stat.count) : 0;
+        const tier = !stat.count ? 'is-pending' : avg >= 80 ? 'is-high' : avg >= 60 ? 'is-mid' : 'is-low';
+        return `<div class="x-feed-item">
+          <div class="x-feed-avatar">${iconTile(ICONS.folder, sub.color)}</div>
+          <div class="x-feed-body">
+            <div class="x-feed-header">
+              <div>
+                <strong>${escapeHtml(sub.name)}</strong>
+                <span class="x-feed-meta"> · ${sub.topics.length} ${sub.topics.length === 1 ? 'temario' : 'temarios'}</span>
+              </div>
+              <span class="score-badge ${tier}">${stat.count ? `Media: ${avg}% · Mejor: ${stat.best}%` : 'Sin intentos'}</span>
+            </div>
+            <p class="x-feed-text">${escapeHtml(sub.description)}</p>
+            <div class="subject-progress-bar x-progress-bar"><span style="width:${stat.count ? Math.max(4, Math.min(100, avg)) : 0}%"></span></div>
+            <div class="x-feed-footer">
+              <span>${stat.count} ${stat.count === 1 ? 'test completado' : 'tests completados'}</span>
+              <div class="topic-actions">
+                <button class="secondary-button" type="button" data-open-exam data-subject="${escapeHtml(sub.id)}">${ICONS.clock} Simulacro</button>
+                <a class="primary-button" href="#asignatura/${encodeURIComponent(sub.id)}">Ver temario ${ICONS.arrow}</a>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      })
+      .join('');
+
+    tabContentHtml = cardsHtml || '<div class="admin-empty-state"><p>Todavía no hay asignaturas disponibles.</p></div>';
+  } else if (tab === 'cuenta') {
+    if (!dataService.isAuthAvailable()) {
+      tabContentHtml = `<div class="x-account-section"><p class="account-text">El modo en la nube (Supabase Auth) no está configurado en este entorno. Tus datos se guardan localmente en este navegador.</p></div>`;
+    } else if (!loggedIn) {
+      tabContentHtml = `
+        <div class="x-account-section">
+          <div class="x-account-card">
+            <p class="eyebrow">SINCRONIZACIÓN EN LA NUBE</p>
+            <h3>Inicia sesión o crea tu cuenta</h3>
+            <p class="account-text">Accede con tu correo y contraseña para sincronizar tu foto de perfil, tu historial de notas y tu banco de fallos en todos tus dispositivos.</p>
+            <form class="account-form account-form-stack" id="page-login-form">
+              <label class="profile-name-field">
+                <span>Correo electrónico</span>
+                <input id="page-login-email" type="email" required autocomplete="email" placeholder="tu@email.com" />
+              </label>
+              <label class="profile-name-field">
+                <span>Contraseña</span>
+                <input id="page-login-password" type="password" minlength="6" autocomplete="current-password" placeholder="Contraseña (mín. 6 caracteres)" />
+              </label>
+              <div class="account-actions">
+                <button class="primary-button" id="page-login-submit" type="submit">Entrar / Crear cuenta</button>
+                <button class="secondary-button" id="page-magic-link-btn" type="button">Enviar enlace mágico al correo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+    } else {
+      tabContentHtml = `
+        <div class="x-account-section">
+          <div class="x-account-card">
+            <p class="eyebrow">SESIÓN ACTIVA</p>
+            <h3>Conectado como ${escapeHtml(email)}</h3>
+            <p class="account-text">Tu foto de perfil, tu nombre, tu historial de notas y tus preguntas falladas se sincronizan automáticamente con Supabase.</p>
+            <div class="x-password-box">
+              <label class="profile-name-field">
+                <span>Cambiar o definir contraseña de acceso</span>
+                <div class="account-password-row">
+                  <input id="page-new-password" type="password" minlength="6" autocomplete="new-password" placeholder="Nueva contraseña (mín. 6 caracteres)" />
+                  <button class="secondary-button" id="page-save-password-btn" type="button">Guardar clave</button>
+                </div>
+              </label>
+            </div>
+            <div class="x-account-danger-row">
+              <span>¿Quieres salir de tu cuenta en este dispositivo?</span>
+              <button class="secondary-button" id="page-logout-btn" type="button">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  } else {
+    // Tab por defecto: 'actividad' (Timeline estilo Twitter/X)
+    if (!scores.length) {
+      tabContentHtml = `
+        <div class="admin-empty-state x-empty-feed">
+          <h3>Tu timeline de estudio está vacío</h3>
+          <p>Completa cualquier test o lanza un simulacro de examen para que tus resultados aparezcan publicados aquí.</p>
+          <div class="result-buttons" style="margin-top:14px">
+            <a class="primary-button" href="#tests">Explorar tests ${ICONS.arrow}</a>
+            <button class="secondary-button" type="button" data-open-exam>${ICONS.clock} Hacer simulacro</button>
+          </div>
+        </div>
+      `;
+    } else {
+      const feedRows = scores
+        .slice(0, 40)
+        .map((item) => {
+          const pct = Number(item.percentage) || 0;
+          const tier = pct >= 80 ? 'is-high' : pct >= 60 ? 'is-mid' : 'is-low';
+          const isSim = String(item.section || '').toLowerCase().includes('simulacro');
+          const subObj = catalog.find((s) => s.name === item.subject);
+          return `<article class="x-feed-item">
+            <div class="x-feed-avatar">
+              <span class="avatar x-feed-user-avatar">${avatarInnerHtml}</span>
+            </div>
+            <div class="x-feed-body">
+              <div class="x-feed-header">
+                <div class="x-feed-author">
+                  <strong>${escapeHtml(displayName)}</strong>
+                  <span class="x-feed-handle">${escapeHtml(handle)}</span>
+                  <span class="x-feed-dot">·</span>
+                  <span class="x-feed-time">${escapeHtml(formatAttemptDateTime(item.date))}</span>
+                </div>
+                <span class="score-badge ${tier}">${pct}%</span>
+              </div>
+              <p class="x-feed-action-line">
+                Ha completado ${isSim ? 'un <strong>simulacro de examen</strong>' : 'el cuestionario'} en <strong>${escapeHtml(item.subject || 'Cuaderno')}</strong>
+              </p>
+              <div class="x-feed-card">
+                <div class="x-feed-card-left">
+                  <span class="test-index">${isSim ? ICONS.clock : ICONS.check}</span>
+                  <div>
+                    <strong>${escapeHtml(item.section || 'Cuestionario')}</strong>
+                    <span>${escapeHtml(String(item.score ?? 0))} de ${escapeHtml(String(item.total ?? 0))} aciertos netos · ${escapeHtml(item.subject || '')}</span>
+                  </div>
+                </div>
+                ${subObj ? `<a class="secondary-button" href="#asignatura/${encodeURIComponent(subObj.id)}">Ir al tema ${ICONS.arrow}</a>` : ''}
+              </div>
+            </div>
+          </article>`;
+        })
+        .join('');
+
+      tabContentHtml = `
+        <div class="x-feed-toolbar">
+          <span>Mostrando tus últimos ${Math.min(scores.length, 40)} intentos</span>
+          <button type="button" class="back-link danger-link" id="clear-scores-page-btn">${ICONS.trash} Vaciar historial</button>
+        </div>
+        <div class="x-feed-list">${feedRows}</div>
+      `;
+    }
+  }
+
+  $('#page-content').innerHTML = `
+    <section class="panel x-profile-shell">
+      <header class="x-profile-StickyHead">
+        <a class="x-back-circle" href="#inicio" title="Volver al inicio" aria-label="Volver al inicio">←</a>
+        <div>
+          <div class="x-head-title-row">
+            <h2>${escapeHtml(displayName)}</h2>
+            ${isAdmin ? '<span class="admin-role-badge">Admin</span>' : ''}
+          </div>
+          <span>${attempts} ${attempts === 1 ? 'test completado' : 'tests completados'} · ${questions} preguntas respondidas</span>
+        </div>
+      </header>
+
+      <div class="x-banner" data-banner="${escapeHtml(bannerColor)}"></div>
+
+      <div class="x-profile-main">
+        <div class="x-avatar-bar">
+          <button class="avatar x-profile-avatar" id="x-trigger-avatar-edit" type="button" title="Editar foto y perfil">
+            ${avatarInnerHtml}
+          </button>
+          <div class="x-profile-actions">
+            ${
+              mistakes.length > 0
+                ? `<a class="secondary-button" href="#repaso">${ICONS.target} Repasar ${mistakes.length} ${mistakes.length === 1 ? 'fallo' : 'fallos'}</a>`
+                : ''
+            }
+            <button class="secondary-button x-edit-btn" id="x-open-edit-modal" type="button">Editar perfil</button>
+          </div>
+        </div>
+
+        <div class="x-identity-block">
+          <div class="x-name-line">
+            <h1>${escapeHtml(displayName)}</h1>
+            ${isAdmin ? `<span class="x-verified-badge" title="Administrador verificado">${ICONS.shield} Admin</span>` : ''}
+          </div>
+          <p class="x-handle">${escapeHtml(handle)}${email ? ` · ${escapeHtml(email)}` : ''}</p>
+          <p class="x-bio">${escapeHtml(bio)}</p>
+
+          <div class="x-meta-items">
+            <span>
+              <span class="online-dot" style="display:inline-block;margin-right:4px"></span>
+              ${loggedIn ? 'Sincronizado en la nube' : 'Guardado en este navegador'}
+            </span>
+            <span>·</span>
+            <span>${catalog.length} asignaturas activas</span>
+          </div>
+
+          <div class="x-follow-stats">
+            <a href="#perfil" class="x-stat-pill"><strong>${attempts}</strong> <span>Tests</span></a>
+            <a href="#perfil" class="x-stat-pill"><strong>${average !== null ? `${average}%` : '—'}</strong> <span>Nota media</span></a>
+            <a href="#perfil" class="x-stat-pill"><strong>${questions ? `${correct}/${questions}` : '0'}</strong> <span>Aciertos</span></a>
+            <a href="${mistakes.length ? '#repaso' : '#perfil'}" class="x-stat-pill"><strong>${mistakes.length}</strong> <span>Fallos pendientes</span></a>
+          </div>
+        </div>
+      </div>
+
+      <nav class="x-tabs" aria-label="Secciones del perfil">
+        <button type="button" class="x-tab ${tab === 'actividad' ? 'active' : ''}" data-profile-tab="actividad">
+          <span>Actividad</span>
+        </button>
+        <button type="button" class="x-tab ${tab === 'asignaturas' ? 'active' : ''}" data-profile-tab="asignaturas">
+          <span>Asignaturas</span>
+        </button>
+        <button type="button" class="x-tab ${tab === 'cuenta' ? 'active' : ''}" data-profile-tab="cuenta">
+          <span>Cuenta ${loggedIn ? '✓' : ''}</span>
+        </button>
+      </nav>
+
+      <div class="x-tab-panel">
+        ${tabContentHtml}
+      </div>
+    </section>
+  `;
+
+  bindGenerateButtons();
+
+  $('#x-open-edit-modal')?.addEventListener('click', openEditProfileModal);
+  $('#x-trigger-avatar-edit')?.addEventListener('click', openEditProfileModal);
+
+  $('#page-content').querySelectorAll('[data-profile-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.profileTab;
+      location.hash = next === 'actividad' ? '#perfil' : `#perfil/${next}`;
+    });
+  });
+
+  $('#clear-scores-page-btn')?.addEventListener('click', async () => {
+    if (!confirm('¿Seguro que quieres borrar todo tu historial de notas y estadísticas?')) return;
+    const btn = $('#clear-scores-page-btn');
+    btn.disabled = true;
+    btn.textContent = 'Borrando...';
+    try {
+      await dataService.clearScores();
+      showToast('Historial de notas vaciado.');
+      renderProfile('actividad');
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Vaciar historial';
+      showToast(err.message || 'No se pudo borrar el historial.', 4500);
+    }
+  });
+
+  $('#page-login-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const loginEmail = $('#page-login-email').value.trim();
+    const password = $('#page-login-password').value;
+    if (!loginEmail) return;
+    if (!password || password.length < 6) {
+      showToast('Introduce una contraseña de al menos 6 caracteres, o pulsa "Enviar enlace mágico".', 5000);
+      return;
+    }
+    const button = $('#page-login-submit');
+    button.disabled = true;
+    button.textContent = 'Entrando...';
+    try {
+      const res = await dataService.signInWithPassword(loginEmail, password);
+      if (res.status === 'confirm_email') {
+        showToast(`Te hemos enviado un correo a ${loginEmail} para confirmar tu cuenta.`, 7000);
+        button.disabled = false;
+        button.textContent = 'Entrar / Crear cuenta';
+      } else {
+        updateProfileLabels();
+        await renderSidebar();
+        renderProfile('actividad');
+        showToast(`Sesión iniciada como ${loginEmail}.`, 4000);
+      }
+    } catch (err) {
+      button.disabled = false;
+      button.textContent = 'Entrar / Crear cuenta';
+      showToast(err.message || 'No se pudo iniciar sesión.', 6000);
+    }
+  });
+
+  $('#page-magic-link-btn')?.addEventListener('click', async () => {
+    const loginEmail = $('#page-login-email')?.value?.trim();
+    if (!loginEmail) {
+      showToast('Escribe tu correo primero para enviarte el enlace.', 4000);
+      $('#page-login-email')?.focus();
+      return;
+    }
+    const button = $('#page-magic-link-btn');
+    button.disabled = true;
+    button.textContent = 'Enviando...';
+    try {
+      await dataService.sendMagicLink(loginEmail);
+      showToast(`Enlace enviado a ${loginEmail}. Nota: cada enlace del correo sirve para un único uso.`, 7000);
+    } catch (err) {
+      showToast(err.message || 'No se pudo enviar el enlace de acceso.', 5000);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Enviar enlace mágico al correo';
+    }
+  });
+
+  $('#page-save-password-btn')?.addEventListener('click', async () => {
+    const newPass = $('#page-new-password')?.value || '';
+    if (newPass.length < 6) {
+      showToast('La contraseña debe tener al menos 6 caracteres.', 4000);
+      return;
+    }
+    const button = $('#page-save-password-btn');
+    button.disabled = true;
+    button.textContent = 'Guardando...';
+    try {
+      await dataService.updatePassword(newPass);
+      $('#page-new-password').value = '';
+      showToast('Contraseña guardada. Ya puedes usarla en cualquier dispositivo.', 5000);
+    } catch (err) {
+      showToast(err.message || 'No se pudo guardar la contraseña.', 5000);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Guardar clave';
+    }
+  });
+
+  $('#page-logout-btn')?.addEventListener('click', async () => {
+    await dataService.signOut();
+    updateProfileLabels();
+    await renderSidebar();
+    showToast('Sesión cerrada.');
+    renderProfile('cuenta');
+  });
+}
+
 async function renderRoute() {
   await renderSidebar();
   const parts = decodeURI(location.hash.slice(1)).split('/');
@@ -1071,6 +1454,7 @@ async function renderRoute() {
   if (parts[0] === 'tests') return renderTests(parts[1]);
   if (parts[0] === 'test') return startQuiz(parts[1], parts[2], parts[3]);
   if (parts[0] === 'repaso') return startReview(parts[1] || '');
+  if (parts[0] === 'perfil') return renderProfile(parts[1] || 'actividad');
   if (parts[0] === 'admin') return renderAdmin(parts[1] || 'usuarios');
   return renderHome();
 }
@@ -1078,11 +1462,13 @@ async function renderRoute() {
 $('#nav-home').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#inicio'; });
 $('#nav-subjects').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#asignaturas'; });
 $('#nav-tests').addEventListener('click', (event) => { event.preventDefault(); location.hash = '#tests'; });
+$('#nav-profile')?.addEventListener('click', (event) => { event.preventDefault(); location.hash = '#perfil'; });
 $('#nav-admin')?.addEventListener('click', (event) => { event.preventDefault(); location.hash = '#admin'; });
 window.addEventListener('hashchange', renderRoute);
 $('#today-label').textContent = formatDate();
 
 let pendingAvatarDataUrl = '';
+let pendingBannerColor = 'gold';
 
 function renderAvatarContent(node, name, avatarUrl) {
   if (!node) return;
@@ -1137,17 +1523,6 @@ function resizeImageToAvatarDataUrl(file, size = 160) {
   });
 }
 
-function renderAccountState() {
-  const loggedIn = dataService.isLoggedIn();
-  $('#account-box').hidden = !dataService.isAuthAvailable();
-  $('#account-signed-out').hidden = loggedIn;
-  $('#account-signed-in').hidden = !loggedIn;
-  $('#account-email').textContent = loggedIn ? (dataService.getUser()?.email || '') : '';
-  $('#profile-storage-note').textContent = loggedIn
-    ? 'Tu nombre, tus notas y tus fallos se guardan en tu cuenta y se sincronizan entre dispositivos.'
-    : 'Sin sesión, el nombre y el historial se guardan solo en este navegador.';
-}
-
 function setTheme(theme) {
   const light = theme === 'light';
   document.documentElement.dataset.theme = light ? 'light' : 'dark';
@@ -1164,100 +1539,29 @@ function updateModalAvatarPreview() {
   if (removeBtn) {
     removeBtn.hidden = !pendingAvatarDataUrl;
   }
+  const bannerBox = $('#edit-profile-banner');
+  if (bannerBox) {
+    bannerBox.dataset.banner = pendingBannerColor || 'gold';
+  }
+  document.querySelectorAll('#edit-profile-banner [data-banner-color]').forEach((sw) => {
+    sw.classList.toggle('active', sw.dataset.bannerColor === pendingBannerColor);
+  });
 }
 
 function openProfile() {
+  location.hash = '#perfil';
+}
+
+function openEditProfileModal() {
   const modal = $('#profile-modal');
   const currentProfile = dataService.readProfile();
   $('#profile-name-input').value = currentProfile.name || '';
-  pendingAvatarDataUrl = currentProfile.avatar || '';
-  updateModalAvatarPreview();
-  const scores = dataService.readScores();
-  const attempts = scores.length;
-  const questions = scores.reduce((sum, score) => sum + (Number(score.total) || 0), 0);
-  const correct = Math.round(scores.reduce((sum, score) => sum + (Number(score.score) || 0), 0) * 10) / 10;
-  const average = attempts ? Math.round(scores.reduce((sum, score) => sum + (Number(score.percentage) || 0), 0) / attempts) : 0;
-  $('#profile-stats').innerHTML = `<article><strong>${attempts}</strong><span>tests completados</span></article><article><strong>${attempts ? `${average}%` : '—'}</strong><span>media de aciertos</span></article><article><strong>${questions ? `${correct}/${questions}` : '—'}</strong><span>respuestas correctas</span></article>`;
-
-  const historyWrap = $('#profile-history-wrap');
-  if (historyWrap) {
-    if (!scores.length) {
-      historyWrap.innerHTML = '';
-    } else {
-      const bySubject = new Map();
-      for (const s of scores) {
-        const subName = s.subject || 'General';
-        const cur = bySubject.get(subName) || { count: 0, sum: 0 };
-        cur.count += 1;
-        cur.sum += Number(s.percentage) || 0;
-        bySubject.set(subName, cur);
-      }
-
-      const subjectRowsHtml = Array.from(bySubject.entries())
-        .map(([subName, data]) => {
-          const avg = Math.round(data.sum / data.count);
-          return `<div class="subject-progress-item">
-            <div class="subject-progress-top">
-              <strong>${escapeHtml(subName)}</strong>
-              <span>${data.count} ${data.count === 1 ? 'test' : 'tests'} · <strong>${avg}%</strong></span>
-            </div>
-            <div class="subject-progress-bar"><span style="width:${Math.max(2, Math.min(100, avg))}%"></span></div>
-          </div>`;
-        })
-        .join('');
-
-      const attemptRowsHtml = scores
-        .slice(0, 30)
-        .map((item) => {
-          const pct = Number(item.percentage) || 0;
-          const tier = pct >= 80 ? 'is-high' : pct >= 60 ? 'is-mid' : 'is-low';
-          return `<div class="profile-attempt-row">
-            <div class="profile-attempt-copy">
-              <strong>${escapeHtml(item.section || 'Test')}</strong>
-              <span>${escapeHtml(item.subject || '')} · ${escapeHtml(formatAttemptDateTime(item.date))}</span>
-            </div>
-            <div class="profile-attempt-right">
-              <span class="profile-attempt-fraction">${escapeHtml(String(item.score ?? 0))}/${escapeHtml(String(item.total ?? 0))}</span>
-              <span class="score-badge ${tier}">${pct}%</span>
-            </div>
-          </div>`;
-        })
-        .join('');
-
-      historyWrap.innerHTML = `
-        <div class="profile-history-box">
-          <div class="profile-history-head">
-            <span class="account-title">Rendimiento por asignatura</span>
-          </div>
-          <div class="subject-progress-list">${subjectRowsHtml}</div>
-          <div class="profile-history-head profile-history-subhead">
-            <span class="account-title">Historial de intentos (${scores.length})</span>
-            <button type="button" class="back-link danger-link" id="clear-scores-btn">Vaciar historial</button>
-          </div>
-          <div class="profile-attempts-list">${attemptRowsHtml}</div>
-        </div>
-      `;
-
-      $('#clear-scores-btn')?.addEventListener('click', async () => {
-        if (!confirm('¿Seguro que quieres borrar todo tu historial de notas y estadísticas?')) return;
-        const btn = $('#clear-scores-btn');
-        btn.disabled = true;
-        btn.textContent = 'Borrando...';
-        try {
-          await dataService.clearScores();
-          showToast('Historial de notas vaciado.');
-          openProfile();
-          renderRoute();
-        } catch (err) {
-          btn.disabled = false;
-          btn.textContent = 'Vaciar historial';
-          showToast(err.message || 'No se pudo borrar el historial.', 4500);
-        }
-      });
-    }
+  if ($('#profile-bio-input')) {
+    $('#profile-bio-input').value = currentProfile.bio || '';
   }
-
-  renderAccountState();
+  pendingAvatarDataUrl = currentProfile.avatar || '';
+  pendingBannerColor = currentProfile.banner || 'gold';
+  updateModalAvatarPreview();
   modal.hidden = false;
   $('#profile-name-input').focus();
 }
@@ -1422,8 +1726,19 @@ $('#upload-avatar-btn')?.addEventListener('click', () => {
   $('#profile-avatar-input')?.click();
 });
 
+$('#upload-avatar-text-btn')?.addEventListener('click', () => {
+  $('#profile-avatar-input')?.click();
+});
+
 $('#profile-modal-avatar')?.addEventListener('click', () => {
   $('#profile-avatar-input')?.click();
+});
+
+document.querySelectorAll('#edit-profile-banner [data-banner-color]').forEach((sw) => {
+  sw.addEventListener('click', () => {
+    pendingBannerColor = sw.dataset.bannerColor || 'gold';
+    updateModalAvatarPreview();
+  });
 });
 
 $('#profile-avatar-input')?.addEventListener('change', async (event) => {
@@ -1433,7 +1748,7 @@ $('#profile-avatar-input')?.addEventListener('change', async (event) => {
   try {
     pendingAvatarDataUrl = await resizeImageToAvatarDataUrl(file, 160);
     updateModalAvatarPreview();
-    showToast('Foto lista. Pulsa «Guardar perfil» para aplicar los cambios.');
+    showToast('Foto lista. Pulsa «Guardar» para aplicar los cambios.');
   } catch (err) {
     showToast(err.message || 'No se pudo procesar la imagen.', 4500);
   }
@@ -1452,15 +1767,20 @@ $('#profile-name-input')?.addEventListener('input', () => {
 
 $('#save-profile').addEventListener('click', () => {
   const name = $('#profile-name-input').value;
+  const bio = $('#profile-bio-input')?.value || '';
   try {
-    dataService.saveProfile(name, pendingAvatarDataUrl);
+    dataService.saveProfile(name, pendingAvatarDataUrl, {
+      bio,
+      banner: pendingBannerColor
+    });
   } catch {
     showToast('No se pudo guardar el perfil en este navegador.');
     return;
   }
   updateProfileLabels();
   closeProfile();
-  showToast('Perfil guardado.');
+  renderRoute();
+  showToast('Perfil actualizado.');
 });
 
 window.addEventListener('keydown', (event) => {
@@ -1760,87 +2080,6 @@ $('#exam-config-form').addEventListener('submit', async (event) => {
     penaltyPerWrong,
     timerMinutes
   });
-});
-
-$('#login-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const email = $('#login-email').value.trim();
-  const password = $('#login-password').value;
-  if (!email) return;
-  if (!password || password.length < 6) {
-    showToast('Introduce una contraseña de al menos 6 caracteres, o pulsa "Enviar enlace al correo".', 5000);
-    return;
-  }
-  const button = $('#login-submit');
-  button.disabled = true;
-  button.textContent = 'Entrando...';
-  try {
-    const res = await dataService.signInWithPassword(email, password);
-    if (res.status === 'confirm_email') {
-      showToast(`Te hemos enviado un correo a ${email} para confirmar tu cuenta.`, 7000);
-    } else {
-      $('#login-password').value = '';
-      updateProfileLabels();
-      openProfile();
-      renderRoute();
-      showToast(`Sesión iniciada como ${email}.`, 4000);
-    }
-  } catch (err) {
-    showToast(err.message || 'No se pudo iniciar sesión.', 6000);
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Entrar / Crear cuenta';
-  }
-});
-
-$('#magic-link-button').addEventListener('click', async () => {
-  const email = $('#login-email').value.trim();
-  if (!email) {
-    showToast('Escribe tu correo primero para enviarte el enlace.', 4000);
-    $('#login-email').focus();
-    return;
-  }
-  const button = $('#magic-link-button');
-  button.disabled = true;
-  button.textContent = 'Enviando...';
-  try {
-    await dataService.sendMagicLink(email);
-    showToast(`Enlace enviado a ${email}. Nota: cada enlace del correo sirve para un único uso.`, 7000);
-  } catch (err) {
-    showToast(err.message || 'No se pudo enviar el enlace de acceso.', 5000);
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Enviar enlace al correo';
-  }
-});
-
-$('#save-password-button').addEventListener('click', async () => {
-  const newPass = $('#new-password-input').value;
-  if (!newPass || newPass.length < 6) {
-    showToast('La contraseña debe tener al menos 6 caracteres.', 4000);
-    return;
-  }
-  const button = $('#save-password-button');
-  button.disabled = true;
-  button.textContent = 'Guardando...';
-  try {
-    await dataService.updatePassword(newPass);
-    $('#new-password-input').value = '';
-    showToast('Contraseña guardada. Ya puedes usarla para entrar desde cualquier dispositivo.', 5000);
-  } catch (err) {
-    showToast(err.message || 'No se pudo guardar la contraseña.', 5000);
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Guardar clave';
-  }
-});
-
-$('#logout-button').addEventListener('click', async () => {
-  await dataService.signOut();
-  closeProfile();
-  updateProfileLabels();
-  showToast('Sesión cerrada.');
-  renderRoute();
 });
 
 try { setTheme(localStorage.getItem(THEME_KEY) || 'dark'); } catch { setTheme('dark'); }

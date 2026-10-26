@@ -204,6 +204,15 @@ export const handler = async (event) => {
         }).catch(() => {});
       }
 
+      const cleanBio =
+        parsedBody.bio !== undefined
+          ? String(parsedBody.bio || '').trim().slice(0, 160)
+          : userAuth.user.user_metadata?.bio || '';
+      const cleanBanner =
+        parsedBody.banner !== undefined
+          ? String(parsedBody.banner || 'gold').trim()
+          : userAuth.user.user_metadata?.banner || 'gold';
+
       await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
         method: 'PUT',
         headers: sbHeaders,
@@ -211,6 +220,8 @@ export const handler = async (event) => {
           user_metadata: {
             ...(userAuth.user.user_metadata || {}),
             name: cleanName,
+            bio: cleanBio,
+            banner: cleanBanner,
             avatar_url: finalAvatarUrl
           }
         })
