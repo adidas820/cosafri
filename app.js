@@ -248,7 +248,35 @@ async function renderTopic(subjectId, topicId) {
   bindGenerateButtons();
 }
 
+function shuffleArray(items = []) {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function shuffleQuestionOptions(question) {
+  if (!question || !Array.isArray(question.options) || question.options.length <= 1) {
+    return { ...question };
+  }
+  const correctIndex = Number(question.answer) || 0;
+  const indexed = shuffleArray(
+    question.options.map((text, idx) => ({
+      text,
+      isCorrect: idx === correctIndex
+    }))
+  );
+  return {
+    ...question,
+    options: indexed.map((item) => item.text),
+    answer: Math.max(0, indexed.findIndex((item) => item.isCorrect))
+  };
+}
+
 async function startQuiz(subjectId, topicId, sectionId) {
+  stopExamTimer();
   renderLoading('Cargando preguntas del test...');
   try {
     const result = await dataService.getSection(subjectId, topicId, sectionId);
@@ -257,11 +285,15 @@ async function startQuiz(subjectId, topicId, sectionId) {
       return renderTests(subjectId);
     }
     const { subject, topic, section } = result;
+    const shuffledQuestions = section.questions.map(shuffleQuestionOptions);
     activeQuiz = {
       subject,
       topic,
-      section,
-      order: [...section.questions.keys()].sort(() => Math.random() - 0.5),
+      section: {
+        ...section,
+        questions: shuffledQuestions
+      },
+      order: shuffleArray([...shuffledQuestions.keys()]),
       index: 0,
       score: 0,
       selected: null,
@@ -471,13 +503,15 @@ function reviewBanner(mistakes = [], subjectId = '') {
 }
 
 function launchReviewQuiz(questions, subjectId = '', title = 'Repaso de fallos') {
+  stopExamTimer();
+  const shuffledQuestions = questions.map(shuffleQuestionOptions);
   activeQuiz = {
     mode: 'review',
     reviewSubjectId: subjectId,
     subject: { id: subjectId, name: 'Repaso' },
     topic: { id: '', name: title },
-    section: { id: 'repaso', name: title, questions },
-    order: [...questions.keys()],
+    section: { id: 'repaso', name: title, questions: shuffledQuestions },
+    order: [...shuffledQuestions.keys()],
     index: 0,
     score: 0,
     selected: null,
@@ -1404,7 +1438,9 @@ async function startExamSimulation({
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
 
-    const finalQuestions = pool.slice(0, Math.max(1, Math.min(pool.length, Number(questionCount) || 20)));
+    const finalQuestions = pool
+      .slice(0, Math.max(1, Math.min(pool.length, Number(questionCount) || 20)))
+      .map(shuffleQuestionOptions);
     const mins = Math.max(0, Number(timerMinutes) || 0);
     const now = Date.now();
 
